@@ -27,6 +27,7 @@ private:
     ListDauSach dsDauSach;
     NodeDocGia* rootDocGia;
     BinaryKeyQueue kmDocGia;
+    int totalBorrowing;
 
     static std::string trim(const std::string& str) {
         size_t first = str.find_first_not_of(" \t\r\n");
@@ -115,11 +116,13 @@ private:
     }
 
 public:
-    LibraryService() : rootDocGia(nullptr) {
+    LibraryService() : rootDocGia(nullptr), totalBorrowing(0) {
         kmDocGia.init(131071);
     }
 
     ~LibraryService() { clearData(); }
+
+    int getTotalBorrowing() const { return totalBorrowing; }
 
     void clearData() {
         for (int i = 0; i < dsDauSach.n; i++) {
@@ -130,6 +133,7 @@ public:
         dsDauSach.n = 0;
         freeBST(rootDocGia);
         rootDocGia = nullptr;
+        totalBorrowing = 0;
         kmDocGia.init(131071);
     }
 
@@ -240,6 +244,8 @@ public:
 
                         std::getline(ssMT, token, '|'); p->data.trangThai = (TrangThaiMuonTra)safeStoi(token);
                         p->next = nullptr;
+
+                        if (p->data.trangThai == DANG_MUON) totalBorrowing++;
 
                         if (!dg.dsMuonTra) dg.dsMuonTra = p;
                         else tailMT->next = p;
@@ -594,6 +600,7 @@ public:
 
         nodeSach->data.trangThai = DA_CHO_MUON;
         dauSach->soLuotMuon++;
+        totalBorrowing++;
 
         NodeMuonTra* newMT = new NodeMuonTra;
         strcpy(newMT->data.maSach, nodeSach->data.maSach);
@@ -618,6 +625,7 @@ public:
                 findDauSachByMaSach(maSach, nodeSach);
                 if (nodeSach) nodeSach->data.trangThai = (trangThaiMoi == 1) ? CHO_MUON_DUOC : DA_THANH_LY;
                 if (trangThaiMoi == 2) dg->data.trangThai = KHOA;
+                if (totalBorrowing > 0) totalBorrowing--;
                 return "OK";
             }
             mt = mt->next;

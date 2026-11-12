@@ -1,4 +1,5 @@
-// gendata.cpp — Gen 100.000 độc giả KHÔNG TRÙNG HỌ VÀ TÊN, 100 đầu sách, 10–50 cuốn/đầu sách
+// gendata.cpp — Gen 100.000 độc giả KHÔNG TRÙNG HỌ VÀ TÊN
+// Không gian tên: 70 họ × 60 đệm × 200 tên = 840.000 tổ hợp
 // Build: g++ -std=c++17 -O2 gendata.cpp -o gendata
 // Run:   ./gendata
 
@@ -17,46 +18,73 @@ static const double RATIO_CO_MUON   = 0.35;
 static const int    MAX_MUON_PER_DG = 3;
 static const double RATIO_DANG_MUON = 0.25;
 
-// ==================== DỮ LIỆU MẪU ĐỘC GIẢ (35 Họ * 30 Đệm * 100 Tên = 105.000 tổ hợp duy nhất) ====================
+// ==================== HỌ (70) ====================
 static const char* HO[] = {
     "Nguyen","Tran","Le","Pham","Hoang","Huynh","Phan","Vu","Vo","Dang",
     "Bui","Do","Ho","Ngo","Duong","Ly","Truong","Dinh","Lam","Mai",
     "Trinh","Dao","Doan","Vuong","Ton","Luong","Thai","Ta","Chau","Quach",
-    "Phung","Ha","Tang","Mac","Kieu"
+    "Phung","Ha","Tang","Mac","Kieu",
+    // ===== Thêm 35 họ =====
+    "La","Dam","Trieu","Quan","Giap","Khuc","Ninh","Ong","Luc","Vi",
+    "Ban","Cam","Chu","Danh","Diep","Giang","Hac","Han","Hoa","Khong",
+    "Lac","Lieu","Lo","Ma","Nghiem","Nhan","Phi","Phuong","So","Tam",
+    "Thach","Thieu","Ung","Van","Xa"
 };
-static const int N_HO = sizeof(HO) / sizeof(HO[0]); // 35
+static const int N_HO = sizeof(HO) / sizeof(HO[0]); // 70
 
-// 15 Đệm Nam + 15 Đệm Nữ = 30 Đệm
+// ==================== ĐỆM NAM (30) ====================
 static const char* DEM_NAM[] = {
     "Van","Huu","Duc","Minh","Quang","Hoang","Gia","Quoc","Thanh","Tuan",
-    "Bao","Anh","Cong","Duy","Ngoc"
+    "Bao","Anh","Cong","Duy","Ngoc",
+    // ===== Thêm 15 đệm nam =====
+    "Dinh","Khanh","Phu","Phuc","Tai","Thien","Trong","Trung","Tu","Vien",
+    "Vu","Xuan","Binh","Cuong","Hieu"
 };
-static const int N_DEM_NAM = sizeof(DEM_NAM) / sizeof(DEM_NAM[0]); // 15
+static const int N_DEM_NAM = sizeof(DEM_NAM) / sizeof(DEM_NAM[0]); // 30
 
+// ==================== ĐỆM NỮ (30) ====================
 static const char* DEM_NU[] = {
     "Thi","Ngoc","Thu","Thanh","Minh","Phuong","Hong","Kim","My","Bao",
-    "Anh","Thuy","Khanh","Hoai","Dieu"
+    "Anh","Thuy","Khanh","Hoai","Dieu",
+    // ===== Thêm 15 đệm nữ =====
+    "Bich","Cam","Dao","Giang","Ha","Hanh","Hoa","Hue","Huong","Lan",
+    "Linh","Loan","Mai","Nga","Yen"
 };
-static const int N_DEM_NU = sizeof(DEM_NU) / sizeof(DEM_NU[0]); // 15
+static const int N_DEM_NU = sizeof(DEM_NU) / sizeof(DEM_NU[0]); // 30
 
-// 50 Tên Nam + 50 Tên Nữ = 100 Tên
+// ==================== TÊN NAM (100) ====================
 static const char* TEN_NAM[] = {
+    // 50 tên cũ
     "An","Bao","Cuong","Dung","Duc","Hai","Hieu","Hoang","Hung","Huy",
     "Khang","Kien","Long","Minh","Nam","Nghia","Phong","Phuc","Quan","Quang",
     "Son","Tai","Tam","Thanh","Thang","Thinh","Thong","Tien","Toan","Trung",
     "Tuan","Tu","Tung","Viet","Vinh","Vu","Dat","Duy","Giang","Hao",
-    "Hiep","Khoa","Lam","Linh","Loc","Manh","Nhat","Phat","Sang","Tri"
+    "Hiep","Khoa","Lam","Linh","Loc","Manh","Nhat","Phat","Sang","Tri",
+    // ===== Thêm 50 tên nam =====
+    "Bach","Bang","Binh","Cao","Chien","Chinh","Chung","Danh","Dao","Dien",
+    "Dong","Duyen","Gia","Hieu","Hoa","Hoan","Hong","Hung","Kien","Lac",
+    "Lai","Lan","Lap","Loi","Luong","My","Nghiem","Ngoc","Nhan","Ninh",
+    "Phan","Phi","Phu","Quoc","Quy","Si","Tan","Thach","Thien","Tho",
+    "Thu","Tin","Toan","Tri","Tuan","Tuong","Uy","Vinh","Vu","Xuan"
 };
-static const int N_TEN_NAM = sizeof(TEN_NAM) / sizeof(TEN_NAM[0]); // 50
+static const int N_TEN_NAM = sizeof(TEN_NAM) / sizeof(TEN_NAM[0]); // 100
 
+// ==================== TÊN NỮ (100) ====================
 static const char* TEN_NU[] = {
+    // 50 tên cũ
     "Anh","Bich","Chau","Chi","Diep","Dung","Giang","Ha","Hanh","Hoa",
     "Hue","Huong","Lan","Linh","Loan","Mai","My","Nga","Ngan","Ngoc",
     "Nhi","Nhung","Oanh","Phuong","Quynh","Tam","Thao","Thi","Thu","Thuy",
     "Tien","Tram","Trang","Trinh","Truc","Tu","Tuyen","Tuyet","Uyen","Van",
-    "Vi","Vy","Xuan","Yen","Han","Khanh","Ly","Nhu","Suong","Thuyet"
+    "Vi","Vy","Xuan","Yen","Han","Khanh","Ly","Nhu","Suong","Thuyet",
+    // ===== Thêm 50 tên nữ =====
+    "Bao","Binh","Cam","Dao","Diem","Diep","Dong","Gam","Giao","Ha",
+    "Hai","Hang","Hao","Hien","Hoa","Hoai","Hong","Hop","Hue","Huyen",
+    "Kieu","Lam","Le","Lien","Lieu","Linh","Loan","Mai","Man","Minh",
+    "My","Nga","Ngoc","Nhan","Nhi","Nhung","Oanh","Phuong","Quynh","Sang",
+    "Tam","Thanh","Thao","Thi","Thu","Thuy","Tien","Trang","Truc","Van"
 };
-static const int N_TEN_NU = sizeof(TEN_NU) / sizeof(TEN_NU[0]); // 50
+static const int N_TEN_NU = sizeof(TEN_NU) / sizeof(TEN_NU[0]); // 100
 
 // ==================== DỮ LIỆU MẪU ĐẦU SÁCH ====================
 static const char* THE_LOAI[] = {
@@ -105,12 +133,12 @@ int main() {
 #endif
     srand((unsigned)time(nullptr));
 
-    const int TOTAL_DEM = N_DEM_NAM + N_DEM_NU; // 30
-    const int TOTAL_TEN = N_TEN_NAM + N_TEN_NU; // 100
-    const long long TOTAL_COMBOS = (long long)N_HO * TOTAL_DEM * TOTAL_TEN; // 105.000
+    const int TOTAL_DEM = N_DEM_NAM + N_DEM_NU; // 60
+    const int TOTAL_TEN = N_TEN_NAM + N_TEN_NU; // 200
+    const long long TOTAL_COMBOS = (long long)N_HO * TOTAL_DEM * TOTAL_TEN; // 840.000
 
-    // Hệ số nguyên tố cùng nhau với 105.000 (105000 = 2^4 * 3 * 5^4 * 7)
-    // Chọn STEP không chia hết cho 2, 3, 5, 7 -> tạo song ánh (bijection) 1-1 không bao giờ trùng
+    // STEP phải nguyên tố cùng nhau với TOTAL_COMBOS = 840.000 = 2^5 * 3 * 5^4 * 7
+    // Chọn STEP không chia hết cho 2, 3, 5, 7 -> song ánh 1-1
     const long long STEP = 31337;
     const long long SEED = rand() % TOTAL_COMBOS;
 
@@ -172,7 +200,7 @@ int main() {
 
         dg.maThe = svc.generateReaderKey();
 
-        // Ánh xạ 1-1 từ chỉ số i -> comboIdx duy nhất trong [0 .. 104999]
+        // Ánh xạ 1-1 từ chỉ số i -> comboIdx duy nhất trong [0 .. TOTAL_COMBOS-1]
         long long comboIdx = (SEED + (long long)i * STEP) % TOTAL_COMBOS;
 
         int idxHo  = (int)(comboIdx % N_HO);
@@ -184,7 +212,7 @@ int main() {
         const char* hoStr  = HO[idxHo];
         const char* tenStr = isNam ? TEN_NAM[idxTen] : TEN_NU[idxTen - N_TEN_NAM];
 
-        // Giữ tổng số trạng thái đệm đúng 30 mà vẫn ưu tiên đúng giới tính
+        // Giữ tổng số trạng thái đệm đúng 60 mà vẫn ưu tiên đúng giới tính
         const char* demStr = nullptr;
         if (isNam) {
             demStr = (idxDem < N_DEM_NAM) ? DEM_NAM[idxDem] : DEM_NU[idxDem - N_DEM_NAM];
@@ -272,6 +300,7 @@ int main() {
     printf("- Doc gia  : %d (Khong trung Ho & Ten)\n", NUM_DOCGIA);
     printf("- Dau sach : %d\n", dsCount);
     printf("- Tong sach: %d\n", totalSach);
+    printf("- Khong gian ten: %lld to hop\n", TOTAL_COMBOS);
 
     delete[] dsList;
     return 0;

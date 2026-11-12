@@ -457,14 +457,14 @@ private:
     int cmpDocGia(NodeDocGia* a, NodeDocGia* b, int col, int state) {
         int cmp = 0;
         if (col == 0) cmp = a->data.maThe - b->data.maThe;
-        else if (col == 1 || col == 3) {
-            // TEN + HO (1) va TEN (3): So sanh Ten truoc -> Ho dem sau
-            cmp = _stricmp(a->data.ten, b->data.ten);
-            if (cmp == 0) cmp = _stricmp(a->data.ho, b->data.ho);
-        } else if (col == 2) {
-            // HO VA TEN (2): So sanh Ho dem truoc -> Ten sau
+        else if (col == 1) {
+            // HO VA TEN (index 1): So sanh Ho dem truoc -> Ten sau
             cmp = _stricmp(a->data.ho, b->data.ho);
             if (cmp == 0) cmp = _stricmp(a->data.ten, b->data.ten);
+        } else if (col == 2 || col == 3) {
+            // TEN + HO (index 2) va TEN (index 3): So sanh Ten truoc -> Ho dem sau
+            cmp = _stricmp(a->data.ten, b->data.ten);
+            if (cmp == 0) cmp = _stricmp(a->data.ho, b->data.ho);
         } else if (col == 4) cmp = _stricmp(a->data.phai, b->data.phai);
         else if (col == 5) cmp = a->data.trangThai - b->data.trangThai;
         else if (col == 6) {
@@ -578,13 +578,20 @@ private:
     void drawTopDashboard(int totalDG, int totalDS) {
         screen.clear();
         screen.writeStr(2, 0, "[ HE THONG QUAN LY THU VIEN ]", C_HEADER);
+
         Date d = getCurrentDate();
-        char dateBuf[40];
+        char dateBuf[30];
         sprintf(dateBuf, "Ngay: %02d/%02d/%04d", d.d, d.m, d.y);
-        screen.writeStr(SCREEN_W - 20, 0, dateBuf, C_HEADER);
+
         char metricBuf[100];
-        sprintf(metricBuf, " Doc gia: %d | Dau sach: %d ", totalDG, totalDS);
-        screen.writeStr(SCREEN_W - (int)strlen(metricBuf) - 1, 0, metricBuf, C_BORDER);
+        sprintf(metricBuf, " Doc gia: %d | Dau sach: %d | Dang muon: %d ", totalDG, totalDS, service.getTotalBorrowing());
+
+        int metricX = SCREEN_W - (int)strlen(metricBuf) - 1;
+        int dateX   = metricX - (int)strlen(dateBuf) - 2;
+
+        screen.writeStr(dateX, 0, dateBuf, C_HEADER);
+        screen.writeStr(metricX, 0, metricBuf, C_BORDER);
+
         screen.fillRect(0, SCREEN_H - 1, SCREEN_W, 1, C_APP_BG);
 
         if (currentTab == 0) {
@@ -629,8 +636,8 @@ private:
     }
 
     void drawFieldAndSearchBars(bool isTyping) {
-        // TEN + HO (1) dung truoc HO VA TEN (2)
-        const char* filters0[] = {"MA THE", "TEN + HO", "HO VA TEN", "TEN", "PHAI", "TRANG THAI", "DANG MUON"};
+        // HO VA TEN (index 1) dung truoc TEN + HO (index 2)
+        const char* filters0[] = {"MA THE", "HO VA TEN", "TEN + HO", "TEN", "PHAI", "TRANG THAI", "DANG MUON"};
         const char* filters1[] = {"ISBN", "TEN SACH", "TAC GIA", "THE LOAI", "NAM XB", "SO SACH"};
         const char* filters2[] = {"MA THE", "HO TEN", "MA SACH", "TEN SACH", "NGAY MUON", "TINH TRANG"};
         const char* filters3[] = {"MA THE", "HO TEN", "MA SACH", "TEN SACH", "NGAY MUON", "QUA HAN"};
@@ -723,8 +730,8 @@ private:
             if (searchC == 6) LibraryService::checkBorrowStatus(rawArr[i]->data, b, ov);
 
             if (searchC == 0) sprintf(val, "%d", rawArr[i]->data.maThe);
-            else if (searchC == 1) sprintf(val, "%s %s", rawArr[i]->data.ten, rawArr[i]->data.ho); // TEN + HO
-            else if (searchC == 2) sprintf(val, "%s %s", rawArr[i]->data.ho, rawArr[i]->data.ten); // HO VA TEN
+            else if (searchC == 1) sprintf(val, "%s %s", rawArr[i]->data.ho, rawArr[i]->data.ten); // HO VA TEN
+            else if (searchC == 2) sprintf(val, "%s %s", rawArr[i]->data.ten, rawArr[i]->data.ho); // TEN + HO
             else if (searchC == 3) strcpy(val, rawArr[i]->data.ten);                               // TEN
             else if (searchC == 4) strcpy(val, rawArr[i]->data.phai);
             else if (searchC == 5) strcpy(val, rawArr[i]->data.trangThai == HOAT_DONG ? "Hoat dong" : "Bi khoa");
@@ -1287,8 +1294,8 @@ public:
 
         while (true) {
             if (needUpdateData) {
-                // TEN + HO (1) va TEN (3) deu xep theo Ten truoc -> Ho dem sau
-                bool sortByNameInService = (currentTab == 0 && (sortCol[0] == 1 || sortCol[0] == 3) && sortState[0] == 1);
+                // TEN + HO (index 2) va TEN (index 3) deu xep theo Ten truoc -> Ho dem sau
+                bool sortByNameInService = (currentTab == 0 && (sortCol[0] == 2 || sortCol[0] == 3) && sortState[0] == 1);
                 service.getReadersList(bufDgArrRaw, nDGRaw, sortByNameInService);
                 service.getBooksList(bufDsViewRaw, nDSRaw, false);
 
@@ -1401,14 +1408,14 @@ public:
                             }
                         }
                         else if (ext == KEY_F4) {
-                            // Chuyen nhanh qua lai giua TEN + HO (index 1) va MA THE (index 0)
-                            if ((sortCol[0] == 1 || sortCol[0] == 3) && sortState[0] == 1) {
+                            // Chuyen nhanh qua lai giua TEN + HO (index 2) va MA THE (index 0)
+                            if ((sortCol[0] == 2 || sortCol[0] == 3) && sortState[0] == 1) {
                                 sortCol[0] = 0;
                                 selectedCol[0] = 0;
                                 sortState[0] = 1;
                             } else {
-                                sortCol[0] = 1;
-                                selectedCol[0] = 1;
+                                sortCol[0] = 2;
+                                selectedCol[0] = 2;
                                 sortState[0] = 1;
                             }
                             selectedRow = 0; scrollOffset = 0;
