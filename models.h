@@ -173,11 +173,11 @@ struct NodeSach {
 
 struct DauSach {
     char ISBN[15];
-    char tenSach[50];
+    char tenSach[35];
     int soTrang;
-    char tacGia[40];
+    char tacGia[35];
     int namXB;
-    char theLoai[30];
+    char theLoai[35];
     NodeSach* dms;
     int soLuongSach;
     int soLuotMuon;
@@ -202,8 +202,8 @@ struct NodeMuonTra {
 
 struct TheDocGia {
     int maThe;
-    char ho[40];
-    char ten[20];
+    char ho[30];
+    char ten[17];
     char phai[10];
     TrangThaiThe trangThai;
     NodeMuonTra* dsMuonTra;

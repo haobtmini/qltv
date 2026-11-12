@@ -8,7 +8,7 @@
 #include "logic.h"
 
 #define SCREEN_W 122
-#define SCREEN_H 30
+#define SCREEN_H 33          // <-- TANG tu 30 len 33 de chua 20 dong du lieu
 
 #define KEY_TAB 9
 #define KEY_ENTER 13
@@ -25,46 +25,93 @@
 #define KEY_F4 62
 #define KEY_F5 63
 
-#define C_APP_BG        7
-#define C_PANEL_BG      8
-#define C_BORDER        11
-#define C_HEADER        14
-#define C_ROW_NORM      7
-#define C_ROW_SEL       240
-#define C_TAB_ACTIVE    15
-#define C_TAB_INACTIVE  8
-#define C_BADGE_OK      10
-#define C_BADGE_WARN    14
-#define C_BADGE_ERR     12
-#define C_KEYCAP        11
-#define C_DLG_BG        112
-#define C_INPUT_BG      15
-#define C_INPUT_FOCUS   207
+// =========================================================================
+// GHOST-STYLE MINIMALIST PALETTE
+// =========================================================================
+#define C_APP_BG        0x07
+#define C_BRAND         0x0B
+#define C_MUTED         0x08
+#define C_TEXT          0x07
 
-#define C_FIELD_NORM    240 // Nen trang (0xF), chu den (0x0)
-#define C_FIELD_SORT    241 // Nen trang (0xF), chu xanh duong dam (0x1)
-#define C_FIELD_SEL     160 // Nen xanh la sang (0xA), chu den (0x0)
+#define C_BOX_BORDER    0x08
+#define C_TBL_HEADER    0x0B
+#define C_ROW_NORM      0x07
+#define C_ROW_SEL       0x30   // Nen Cyan tram, chu den
+#define C_COL_SEP       0x08
+#define C_COL_SEP_SEL   0x30   // <-- MOI: ke cot tren dong selected (chu den tren nen cyan)
 
-#define C_CATE_HEADER     (14 | (C_APP_BG & 0xF0))
-#define C_CATE_HEADER_SEL (0 | (C_ROW_SEL & 0xF0))
+#define C_FIELD_SEL_BG    0x20   // Chon: nen xanh la dam (2), chu den (0)
+#define C_FIELD_NORM_BG   0x80   // Thuong: nen xam dam (8), chu den (0)
 
-#define B_TL (char)218
-#define B_TR (char)191
-#define B_BL (char)192
-#define B_BR (char)217
-#define B_H  (char)196
-#define B_V  (char)179
-#define B_T  (char)194
-#define B_B  (char)193
-#define B_L  (char)195
-#define B_R  (char)180
-#define B_C  (char)197
-#define B_BLOCK (char)219
+#define C_ROW_ALT       0x80   // Dong le: nen xam dam (8), chu den (0)
+
+#define C_BADGE_OK      0x02
+#define C_BADGE_WARN    0x06
+#define C_BADGE_ERR     0x0C
+#define C_BADGE_INFO    0x0B
+
+#define C_KEYCAP        0x0B
+#define C_KEYDESC       0x08
+
+#define C_DLG_BG        0x07
+#define C_DLG_BORDER    0x0B
+#define C_DLG_TITLE     0x30
+#define C_SHADOW        0x08
+#define C_INPUT_BG      0x08
+#define C_INPUT_FOCUS   0x30
+
+#define C_CATE_HEADER     0x0B
+#define C_CATE_HEADER_SEL 0x30
+
+// <-- MOI: Mau cho cac field chip + tab box
+#define C_TABBOX_BORDER   0x0B   // Vien box bao tab
+#define C_TABBOX_BG       0x07
+#define C_FIELD_BG        0x70   // Nen xam sang, chu den (chip thuong)
+#define C_FIELD_SEL       0x30   // Nen cyan, chu den (chip dang chon)
+#define C_FIELD_SORTED    0x60   // Nen nau vang, chu den (chip co sort arrow)
+#define C_LABEL_FILTER    0x0E   // Vang sang cho "Truong loc"
+#define C_LABEL_SEARCH    0x0E   // Vang sang cho "Tim kiem"
+#define C_METRIC_DG       0x0A   // Xanh la sang cho Doc gia
+#define C_METRIC_DS       0x0B   // Cyan sang cho Dau sach
+#define C_METRIC_MT       0x0E   // Vang sang cho Dang muon
+#define C_METRIC_OH       0x0C   // Do sang cho Qua han
+#define C_METRIC_DATE     0x08   // Xam cho ngay
+
+// =========================================================================
+// UNICODE GLYPHS
+// =========================================================================
+#define U_TL      L'\u256D'
+#define U_TR      L'\u256E'
+#define U_BL      L'\u2570'
+#define U_BR      L'\u256F'
+#define U_H       L'\u2500'
+#define U_V       L'\u2502'
+#define U_VBOLD   L'\u2503'
+#define U_L       L'\u251C'
+#define U_R       L'\u2524'
+#define U_BL_TREE L'\u2514'
+#define U_TRI_R   L'\u2022'
+#define U_ARR_UP  L'\u2191'
+#define U_ARR_DN  L'\u2193'
 
 class ConsoleEngine {
 private:
     HANDLE hOut;
     CHAR_INFO buffer[SCREEN_W * SCREEN_H];
+
+    wchar_t toWideChar(char c) {
+        unsigned char uc = (unsigned char)c;
+        switch (uc) {
+            case 218: return U_TL;
+            case 191: return U_TR;
+            case 192: return U_BL;
+            case 217: return U_BR;
+            case 196: return U_H;
+            case 179: return U_V;
+            case 195: return U_L;
+            default:  return (wchar_t)uc;
+        }
+    }
 
 public:
     void init(const char* windowTitle) {
@@ -72,7 +119,6 @@ public:
         SetConsoleCP(CP_UTF8);
         SetConsoleTitleA(windowTitle);
         hOut = GetStdHandle(STD_OUTPUT_HANDLE);
-        SetConsoleOutputCP(437);
 
         COORD size = { SCREEN_W, SCREEN_H };
         SMALL_RECT rect = { 0, 0, SCREEN_W - 1, SCREEN_H - 1 };
@@ -88,23 +134,20 @@ public:
 
     void clear(WORD attr = C_APP_BG) {
         for (int i = 0; i < SCREEN_W * SCREEN_H; i++) {
-            buffer[i].Char.AsciiChar = ' ';
+            buffer[i].Char.UnicodeChar = L' ';
             buffer[i].Attributes = attr;
         }
     }
 
-    void putChar(int x, int y, char c, WORD attr) {
+    void putWChar(int x, int y, wchar_t wc, WORD attr) {
         if (x >= 0 && x < SCREEN_W && y >= 0 && y < SCREEN_H) {
-            buffer[y * SCREEN_W + x].Char.AsciiChar = c;
+            buffer[y * SCREEN_W + x].Char.UnicodeChar = wc;
             buffer[y * SCREEN_W + x].Attributes = attr;
         }
     }
 
-    char getChar(int x, int y) {
-        if (x >= 0 && x < SCREEN_W && y >= 0 && y < SCREEN_H) {
-            return buffer[y * SCREEN_W + x].Char.AsciiChar;
-        }
-        return ' ';
+    void putChar(int x, int y, char c, WORD attr) {
+        putWChar(x, y, toWideChar(c), attr);
     }
 
     void writeStr(int x, int y, const char* str, WORD attr) {
@@ -118,84 +161,116 @@ public:
         if (y < 0 || y >= SCREEN_H || !str) return;
         int len = (int)strlen(str);
         for (int i = 0; i < width && (x + i) < SCREEN_W; i++) {
-            char ch = (i < len) ? str[i] : ' ';
-            if (i == width - 1 && len > width) ch = '~';
-            putChar(x + i, y, ch, attr);
+            if (i == width - 1 && len > width) {
+                putWChar(x + i, y, L'\u2026', attr);
+            } else {
+                char ch = (i < len) ? str[i] : ' ';
+                putChar(x + i, y, ch, attr);
+            }
         }
     }
 
     void fillRect(int x, int y, int w, int h, WORD attr) {
         for (int r = y; r < y + h && r < SCREEN_H; r++) {
             for (int c = x; c < x + w && c < SCREEN_W; c++) {
-                if (r >= 0 && c >= 0) putChar(c, r, ' ', attr);
+                if (r >= 0 && c >= 0) putWChar(c, r, L' ', attr);
             }
         }
     }
 
-    void drawBox(int x, int y, int w, int h, WORD fillAttr, WORD borderAttr, const char* title = "") {
+    void drawBox(int x, int y, int w, int h, WORD fillAttr, WORD borderAttr, const char* title = "", bool shadow = true, WORD titleAttr = C_DLG_TITLE) {
+        if (shadow) {
+            for (int i = 1; i <= h + 1; i++) {
+                if (y + i < SCREEN_H && x + w + 1 < SCREEN_W) {
+                    putWChar(x + w + 1, y + i, L'\u2591', C_SHADOW);
+                    if (x + w + 2 < SCREEN_W) putWChar(x + w + 2, y + i, L'\u2591', C_SHADOW);
+                }
+            }
+            for (int j = 2; j <= w + 2; j++) {
+                if (y + h + 1 < SCREEN_H && x + j < SCREEN_W) {
+                    putWChar(x + j, y + h + 1, L'\u2591', C_SHADOW);
+                }
+            }
+        }
         for (int i = 0; i <= h; i++) {
             for (int j = 0; j <= w; j++) {
-                char c = ' ';
-                if (i == 0 && j == 0) c = B_TL;
-                else if (i == 0 && j == w) c = B_TR;
-                else if (i == h && j == 0) c = B_BL;
-                else if (i == h && j == w) c = B_BR;
-                else if (i == 0 || i == h) c = B_H;
-                else if (j == 0 || j == w) c = B_V;
-                putChar(x + j, y + i, c, borderAttr);
-                if (i > 0 && i < h && j > 0 && j < w) putChar(x + j, y + i, ' ', fillAttr);
+                wchar_t wc = L' ';
+                if (i == 0 && j == 0) wc = U_TL;
+                else if (i == 0 && j == w) wc = U_TR;
+                else if (i == h && j == 0) wc = U_BL;
+                else if (i == h && j == w) wc = U_BR;
+                else if (i == 0 || i == h) wc = U_H;
+                else if (j == 0 || j == w) wc = U_V;
+                putWChar(x + j, y + i, wc, borderAttr);
+                if (i > 0 && i < h && j > 0 && j < w) putWChar(x + j, y + i, L' ', fillAttr);
             }
         }
         if (title && strlen(title) > 0) {
             char buf[100];
             sprintf(buf, " %s ", title);
-            writeStr(x + 2, y, buf, borderAttr);
+            writeStr(x + 2, y, buf, titleAttr);
         }
     }
 
-    void drawTableGrid(int x, int y, int w, int h, const int colX[], int numCols, const char* headers[], int totalItems, int selectedIdx) {
+    void drawTableGrid(int x, int y, int w, int h, const int colX[], int numCols, const char* headers[], int totalItems, int selectedIdx, int scrollOffset = 0, const char* sectionTitle = "") {
         for (int i = 0; i <= h; i++) {
             for (int j = 0; j <= w; j++) {
-                char c = ' ';
-                if (i == 0 && j == 0) c = B_TL;
-                else if (i == 0 && j == w) c = B_TR;
-                else if (i == h && j == 0) c = B_BL;
-                else if (i == h && j == w) c = B_BR;
-                else if (i == 0 || i == h) c = B_H;
-                else if (j == 0 || j == w) c = B_V;
-                putChar(x + j, y + i, c, C_BORDER);
-                if (i > 0 && i < h && j > 0 && j < w) putChar(x + j, y + i, ' ', C_APP_BG);
+                wchar_t wc = L' ';
+                if (i == 0 && j == 0) wc = U_TL;
+                else if (i == 0 && j == w) wc = U_TR;
+                else if (i == h && j == 0) wc = U_BL;
+                else if (i == h && j == w) wc = U_BR;
+                else if (i == 0 || i == h) wc = U_H;
+                else if (j == 0 || j == w) wc = U_V;
+                putWChar(x + j, y + i, wc, C_BOX_BORDER);
+                if (i > 0 && i < h && j > 0 && j < w) putWChar(x + j, y + i, L' ', C_APP_BG);
             }
         }
 
-        putChar(x, y + 2, B_L, C_BORDER);
-        for (int j = 1; j < w; j++) putChar(x + j, y + 2, B_H, C_BORDER);
-        putChar(x + w, y + 2, B_R, C_BORDER);
-
-        for (int c = 0; c < numCols - 1; c++) {
-            int cx = colX[c + 1] - 1;
-            putChar(cx, y,     B_T, C_BORDER);
-            putChar(cx, y + 1, B_V, C_BORDER);
-            putChar(cx, y + 2, B_C, C_BORDER);
-            for (int r = y + 3; r < y + h; r++) putChar(cx, r, B_V, C_BORDER);
-            putChar(cx, y + h, B_B, C_BORDER);
+        if (sectionTitle && strlen(sectionTitle) > 0) {
+            char tBuf[60];
+            sprintf(tBuf, " %s ", sectionTitle);
+            writeStr(x + 2, y, tBuf, C_BRAND);
         }
 
         for (int c = 0; c < numCols; c++) {
-            writeStr(colX[c] + 1, y + 1, headers[c], C_HEADER);
+            writeStr(colX[c] + 1, y + 1, headers[c], C_TBL_HEADER);
+            if (c > 0) putWChar(colX[c] - 1, y + 1, U_V, C_COL_SEP);
+        }
+
+        putWChar(x, y + 2, U_L, C_BOX_BORDER);
+        for (int j = 1; j < w; j++) putWChar(x + j, y + 2, U_H, C_BOX_BORDER);
+        putWChar(x + w, y + 2, U_R, C_BOX_BORDER);
+
+        int visibleRows = h - 3;
+        if (totalItems > visibleRows && visibleRows > 0) {
+            int trackH = visibleRows;
+            int thumbH = (visibleRows * visibleRows) / totalItems;
+            if (thumbH < 1) thumbH = 1;
+            int maxScroll = totalItems - visibleRows;
+            int thumbPos = (maxScroll > 0) ? (scrollOffset * (trackH - thumbH)) / maxScroll : 0;
+
+            for (int r = 0; r < trackH; r++) {
+                if (r >= thumbPos && r < thumbPos + thumbH) putWChar(x + w, y + 3 + r, U_VBOLD, C_BRAND);
+                else putWChar(x + w, y + 3 + r, U_V, C_COL_SEP);
+            }
         }
 
         char pageInfo[40];
-        sprintf(pageInfo, " Dong %d/%d ", totalItems > 0 ? selectedIdx + 1 : 0, totalItems);
-        writeStr(x + w - (int)strlen(pageInfo) - 2, y + h, pageInfo, C_BORDER);
+        sprintf(pageInfo, " %d / %d ", totalItems > 0 ? selectedIdx + 1 : 0, totalItems);
+        writeStr(x + w - (int)strlen(pageInfo) - 2, y + h, pageInfo, C_BRAND);
     }
 
+    // FIX: khi selected, van ve ke cot voi mau C_COL_SEP_SEL (chu den tren nen cyan)
     WORD prepareTableRow(int x, int y, int w, int rowIdx, const int colX[], int numCols, bool isSelected) {
         WORD rowAttr = isSelected ? C_ROW_SEL : C_ROW_NORM;
-        WORD sepAttr = isSelected ? C_ROW_SEL : C_BORDER;
         fillRect(x + 1, y, w - 1, 1, rowAttr);
-        for (int c = 0; c < numCols - 1; c++) {
-            putChar(colX[c + 1] - 1, y, B_V, sepAttr);
+        if (isSelected) {
+            putWChar(x + 1, y, U_TRI_R, C_ROW_SEL);
+        }
+        // Luon ve ke cot (ca khi selected) -> sua loi mat ke cot
+        for (int c = 1; c < numCols; c++) {
+            putWChar(colX[c] - 1, y, U_V, isSelected ? C_COL_SEP_SEL : C_COL_SEP);
         }
         return rowAttr;
     }
@@ -204,21 +279,21 @@ public:
         COORD bufSize = { SCREEN_W, SCREEN_H };
         COORD bufCoord = { 0, 0 };
         SMALL_RECT writeArea = { 0, 0, SCREEN_W - 1, SCREEN_H - 1 };
-        WriteConsoleOutputA(hOut, buffer, bufSize, bufCoord, &writeArea);
+        WriteConsoleOutputW(hOut, buffer, bufSize, bufCoord, &writeArea);
     }
 
     void showMessage(const char* msg, bool isError = false) {
-        drawBox(30, 11, 60, 6, C_DLG_BG, C_DLG_BG, isError ? "[ L O I ]" : "[ THONG BAO ]");
-        writeStr(33, 13, msg, C_DLG_BG);
-        writeStr(42, 15, " [ ENTER / ESC de dong ] ", C_DLG_BG);
+        drawBox(30, 11, 60, 6, C_DLG_BG, isError ? C_BADGE_ERR : C_DLG_BORDER, isError ? "LOI HE THONG" : "THONG BAO", true, isError ? 0xC0 : C_DLG_TITLE);
+        writeStr(33, 13, msg, isError ? C_BADGE_ERR : C_ROW_NORM);
+        writeStr(42, 15, "[ ENTER / ESC de dong ]", C_MUTED);
         render();
         _getch();
     }
 
     bool showConfirm(const char* msg) {
-        drawBox(30, 11, 60, 6, C_DLG_BG, C_DLG_BG, "[ XAC NHAN ]");
-        writeStr(33, 13, msg, C_DLG_BG);
-        writeStr(35, 15, " [ ENTER/Y: Co  |  ESC/N: Khong ] ", C_DLG_BG);
+        drawBox(30, 11, 60, 6, C_DLG_BG, C_DLG_BORDER, "XAC NHAN");
+        writeStr(33, 13, msg, C_ROW_NORM);
+        writeStr(35, 15, "[ ENTER/Y: Dong y   ESC/N: Huy ]", C_MUTED);
         render();
         while (true) {
             int ch = _getch();
@@ -232,12 +307,26 @@ public:
         int boxH = 6;
         int startX = (SCREEN_W - boxW) / 2;
         int startY = (SCREEN_H - boxH) / 2;
-
-        drawBox(startX, startY, boxW, boxH, C_DLG_BG, C_DLG_BG, "[ THOAT CHUONG TRINH ]");
-        writeStr(startX + 10, startY + 2, "Ban co muon LUU DU LIEU truoc khi thoat chuong trinh?", C_DLG_BG);
-        writeStr(startX + 10, startY + 4, " [ ENTER/Y: Luu & Thoat | N: Thoat luon | ESC: Huy ] ", C_DLG_BG);
+    
+        drawBox(startX, startY, boxW, boxH, C_DLG_BG, C_DLG_BORDER, "THOAT CHUONG TRINH");
+    
+        // Dong 1: "Ban co muon " (trang) + "LUU DU LIEU" (do) + " truoc khi thoat chuong trinh?" (trang)
+        const char* part1 = "Ban co muon ";
+        const char* part2 = "LUU DU LIEU";
+        const char* part3 = " truoc khi thoat chuong trinh?";
+        int y1 = startY + 2;
+        int x1 = startX + 10;
+    
+        writeStr(x1, y1, part1, C_ROW_NORM);
+        x1 += (int)strlen(part1);
+        writeStr(x1, y1, part2, C_BADGE_ERR);   // do
+        x1 += (int)strlen(part2);
+        writeStr(x1, y1, part3, C_ROW_NORM);
+    
+        // Dong 2: huong dan - vang
+        writeStr(startX + 13, startY + 4, "[ ENTER/Y: Luu & Thoat | N: Thoat | ESC: Huy ]", C_BADGE_WARN);
         render();
-
+    
         while (true) {
             int ch = _getch();
             if (ch == KEY_ENTER || ch == 'y' || ch == 'Y') return 1;
@@ -254,32 +343,41 @@ public:
         int curField = 0;
 
         while (true) {
-            drawBox(startX, startY, boxW, boxH, C_DLG_BG, C_DLG_BG, title);
+            drawBox(startX, startY, boxW, boxH, C_DLG_BG, C_DLG_BORDER, title);
             int curY = startY + 2;
 
             if (readOnlyInfo) {
-                writeStr(startX + 3, curY, readOnlyInfo, C_DLG_BG);
+                writeStr(startX + 3, curY, readOnlyInfo, C_BRAND);
                 curY += 2;
             }
 
             for (int i = 0; i < numFields; i++) {
                 bool isFocus = (i == curField);
                 bool isToggle = (toggleOpts && toggleOpts[i] && strlen(toggleOpts[i]) > 0);
-                writeStr(startX + 3, curY, labels[i], C_DLG_BG);
+                if (isFocus) putWChar(startX + 1, curY, U_TRI_R, C_BRAND);
+                writeStr(startX + 3, curY, labels[i], isFocus ? C_BRAND : C_ROW_NORM);
 
-                int inpX = startX + 30;
-                int inpW = boxW - 33;
+                int inpX = startX + 28;
+                int inpW = boxW - 31;
                 WORD inpCol = isFocus ? C_INPUT_FOCUS : C_INPUT_BG;
 
-                fillRect(inpX, curY, inpW, 1, inpCol);
+                if (!isFocus) {
+                    for (int k = 0; k < inpW; k++) putWChar(inpX + k, curY, L'.', C_MUTED);
+                } else {
+                    fillRect(inpX, curY, inpW, 1, inpCol);
+                }
 
                 if (isToggle) {
                     char displayVal[60];
                     if (isFocus) sprintf(displayVal, "< %s >", values[i]);
                     else sprintf(displayVal, "  %s  ", values[i]);
-                    writeStr(inpX + 1, curY, displayVal, inpCol);
+                    writeStr(inpX + 1, curY, displayVal, isFocus ? inpCol : C_ROW_NORM);
                 } else {
-                    writeStr(inpX + 1, curY, values[i], inpCol);
+                    writeStr(inpX + 1, curY, values[i], isFocus ? inpCol : C_ROW_NORM);
+                    if (isFocus) {
+                        int vLen = (int)strlen(values[i]);
+                        if (vLen < inpW - 1) putWChar(inpX + 1 + vLen, curY, L'_', inpCol);
+                    }
                 }
                 curY += 2;
             }
@@ -288,8 +386,8 @@ public:
             if (toggleOpts) {
                 for (int i = 0; i < numFields; i++) if (toggleOpts[i] && strlen(toggleOpts[i]) > 0) hasToggle = true;
             }
-            if (hasToggle) writeStr(startX + 2, startY + boxH - 2, "[Up/Down]: Chon  [<-/->]: Doi G.Tri  [Enter]: Luu", C_DLG_BG);
-            else writeStr(startX + 3, startY + boxH - 2, "[Up/Down]: Chon  [Enter]: Luu  [ESC]: Huy", C_DLG_BG);
+            if (hasToggle) writeStr(startX + 3, startY + boxH - 2, "Up/Down: Chon  |  <-/->: Doi gia tri  |  Enter: Luu", C_MUTED);
+            else writeStr(startX + 3, startY + boxH - 2, "Up/Down: Chon  |  Enter: Luu  |  ESC: Huy", C_MUTED);
 
             render();
 
@@ -341,8 +439,14 @@ public:
                 if (!isToggle) {
                     int len = (int)strlen(values[curField]);
                     if (len < maxLens[curField]) {
-                        values[curField][len] = (char)ch;
-                        values[curField][len + 1] = '\0';
+                        bool isSpace = (ch == ' ');
+                        bool lastIsSpace = (len > 0 && values[curField][len - 1] == ' ');
+                        if (isSpace && (len == 0 || lastIsSpace)) {
+                            // Bo qua: khong cho space dau tien hoac 2 space lien tiep
+                        } else {
+                            values[curField][len] = (char)ch;
+                            values[curField][len + 1] = '\0';
+                        }
                     }
                 }
             }
@@ -383,7 +487,7 @@ private:
 
     int selectedCol[5] = {0, 1, 0, 5, 0};
     int sortCol[5]     = {0, 1, 0, 5, 0};
-    int sortState[5]   = {1, 1, 1, 1, 1};
+    int sortState[5]   = {1, 1, 1, 2, 1};
     char searchKeyword[5][50] = {"", "", "", "", ""};
 
     int numFiltersForTab[5] = {7, 6, 6, 6, 5};
@@ -444,7 +548,24 @@ private:
         char t[300], k[200];
         LibraryService::toUpperStr(t, text);
         LibraryService::toUpperStr(k, keyword);
-        return strstr(t, k) != nullptr;
+        size_t kLen = strlen(k);
+    
+        // Kiem tra space cuoi
+        bool hasTrailingSpace = (kLen > 0 && k[kLen - 1] == ' ');
+        // Bo space cuoi
+        while (kLen > 0 && k[kLen - 1] == ' ') k[--kLen] = '\0';
+        if (kLen == 0) return true;
+    
+        // Buoc 1: strict prefix
+        if (strncmp(t, k, kLen) != 0) return false;
+    
+        // Buoc 2: neu co space cuoi -> phai khop chinh xac toi cuoi tu
+        if (hasTrailingSpace) {
+            // Sau kLen ky tu phai la: het chuoi HOAC space (ranh gioi tu)
+            if (t[kLen] != '\0' && t[kLen] != ' ') return false;
+        }
+    
+        return true;
     }
 
     void buildHeaders(const char* raw[], int numCols, int tab, char outBuf[][50], const char* outPtr[]) {
@@ -458,11 +579,9 @@ private:
         int cmp = 0;
         if (col == 0) cmp = a->data.maThe - b->data.maThe;
         else if (col == 1) {
-            // HO VA TEN (index 1): So sanh Ho dem truoc -> Ten sau
             cmp = _stricmp(a->data.ho, b->data.ho);
             if (cmp == 0) cmp = _stricmp(a->data.ten, b->data.ten);
         } else if (col == 2 || col == 3) {
-            // TEN + HO (index 2) va TEN (index 3): So sanh Ten truoc -> Ho dem sau
             cmp = _stricmp(a->data.ten, b->data.ten);
             if (cmp == 0) cmp = _stricmp(a->data.ho, b->data.ho);
         } else if (col == 4) cmp = _stricmp(a->data.phai, b->data.phai);
@@ -575,141 +694,228 @@ private:
         if (i < right) qsOverdueRecord(arr, i, right, col, state);
     }
 
+    void drawKeyHint(int& x, int y, const char* key, const char* desc) {
+        if (x + (int)strlen(key) + (int)strlen(desc) + 4 >= SCREEN_W) return;
+    
+        // Key: nen xam dam (8), chu den (0) — khong ngoac
+        char kBuf[20];
+        sprintf(kBuf, " %s ", key);           // padding 1 o moi ben
+        int kW = (int)strlen(kBuf);
+    
+        screen.fillRect(x, y, kW, 1, 0x80);   // to nen xam dam
+        screen.writeStr(x, y, kBuf, 0x80);    // chu den
+        x += kW + 1;
+    
+        // Desc: giu mau muted nhu cu
+        screen.writeStr(x, y, desc, C_KEYDESC);
+        x += (int)strlen(desc) + 2;
+    }
+
+    // =====================================================================
+    // TOP DASHBOARD: them "Qua han" + moi metric mot mau noi bat
+    // =====================================================================
     void drawTopDashboard(int totalDG, int totalDS) {
         screen.clear();
-        screen.writeStr(2, 0, "[ HE THONG QUAN LY THU VIEN ]", C_HEADER);
+
+        screen.putWChar(2, 0, L'\u25C6', C_BRAND);
+        screen.writeStr(4, 0, " Quan ly thu vien", C_MUTED);
+
+        // Tinh so qua han
+        int nQHCount = 0;
+        {
+            OverdueRecord tmp[2000];
+            service.getOverdueList(tmp, nQHCount);
+            if (nQHCount > 2000) nQHCount = 2000;
+        }
 
         Date d = getCurrentDate();
+
+        // Ve tung metric voi mau rieng, can le phai
+        int rightEdge = SCREEN_W - 2;
         char dateBuf[30];
-        sprintf(dateBuf, "Ngay: %02d/%02d/%04d", d.d, d.m, d.y);
+        sprintf(dateBuf, "%02d/%02d/%04d", d.d, d.m, d.y);
+        int dateX = rightEdge - (int)strlen(dateBuf);
+        screen.writeStr(dateX, 0, dateBuf, C_METRIC_DATE);
 
-        char metricBuf[100];
-        sprintf(metricBuf, " Doc gia: %d | Dau sach: %d | Dang muon: %d ", totalDG, totalDS, service.getTotalBorrowing());
+        char ohBuf[40]; sprintf(ohBuf, "Qua han: %d", nQHCount);
+        int ohX = dateX - (int)strlen(ohBuf) - 4;
+        screen.writeStr(ohX, 0, ohBuf, C_METRIC_OH);
 
-        int metricX = SCREEN_W - (int)strlen(metricBuf) - 1;
-        int dateX   = metricX - (int)strlen(dateBuf) - 2;
+        char mtBuf[40]; sprintf(mtBuf, "Dang muon: %d", service.getTotalBorrowing());
+        int mtX = ohX - (int)strlen(mtBuf) - 4;
+        screen.writeStr(mtX, 0, mtBuf, C_METRIC_MT);
 
-        screen.writeStr(dateX, 0, dateBuf, C_HEADER);
-        screen.writeStr(metricX, 0, metricBuf, C_BORDER);
+        char dsBuf[40]; sprintf(dsBuf, "Dau sach: %d", totalDS);
+        int dsX = mtX - (int)strlen(dsBuf) - 4;
+        screen.writeStr(dsX, 0, dsBuf, C_METRIC_DS);
 
-        screen.fillRect(0, SCREEN_H - 1, SCREEN_W, 1, C_APP_BG);
+        char dgBuf[40]; sprintf(dgBuf, "Doc gia: %d", totalDG);
+        int dgX = dsX - (int)strlen(dgBuf) - 4;
+        screen.writeStr(dgX, 0, dgBuf, C_METRIC_DG);
 
+        // Footer
+        int kx = 2;
         if (currentTab == 0) {
-            screen.writeStr(1, SCREEN_H - 1, "ENTER:Chi tiet  F1:Them  F2:Sua  F3:Xoa  F4:Ten/Ma  |  TAB:Doi Tab  <- ->:Truong  F:Tim  S:Sort  ESC:Thoat", C_KEYCAP);
+            drawKeyHint(kx, SCREEN_H - 1, "ENTER", "Chi tiet");
+            drawKeyHint(kx, SCREEN_H - 1, "F1", "Them");
+            drawKeyHint(kx, SCREEN_H - 1, "F2", "Sua");
+            drawKeyHint(kx, SCREEN_H - 1, "F3", "Xoa");
+            drawKeyHint(kx, SCREEN_H - 1, "F4", "tang theo Ten+Ho/Ma");
+            drawKeyHint(kx, SCREEN_H - 1, "F", "Tim");
+            drawKeyHint(kx, SCREEN_H - 1, "S", "Sort");
+            drawKeyHint(kx, SCREEN_H - 1, "TAB", "Chuyen Tab");
         } else if (currentTab == 1) {
             if (viewCategoryTree) {
-                screen.writeStr(1, SCREEN_H - 1, "ENTER:Chi tiet  F1:Them  F2:Sua  F3:Xoa  F4:Xem thuong  |  TAB:Doi Tab  ESC:Thoat", C_KEYCAP);
+                drawKeyHint(kx, SCREEN_H - 1, "ENTER", "Chi tiet");
+                drawKeyHint(kx, SCREEN_H - 1, "F1", "Them");
+                drawKeyHint(kx, SCREEN_H - 1, "F2", "Sua");
+                drawKeyHint(kx, SCREEN_H - 1, "F3", "Xoa");
+                drawKeyHint(kx, SCREEN_H - 1, "F4", "Bang thuong");
+                drawKeyHint(kx, SCREEN_H - 1, "TAB", "Chuyen Tab");
             } else {
-                screen.writeStr(1, SCREEN_H - 1, "ENTER:Chi tiet  F1:Them  F2:Sua  F3:Xoa  F4:The loai  F5:Tim Ma  |  TAB:Tab  <- ->:Truong  F:Tim  S:Sort", C_KEYCAP);
+                drawKeyHint(kx, SCREEN_H - 1, "ENTER", "Chi tiet");
+                drawKeyHint(kx, SCREEN_H - 1, "F1", "Them");
+                drawKeyHint(kx, SCREEN_H - 1, "F2", "Sua");
+                drawKeyHint(kx, SCREEN_H - 1, "F3", "Xoa");
+                drawKeyHint(kx, SCREEN_H - 1, "F4", "The loai");
+                drawKeyHint(kx, SCREEN_H - 1, "F5", "Tim Sach");
+                drawKeyHint(kx, SCREEN_H - 1, "F", "Tim");
+                drawKeyHint(kx, SCREEN_H - 1, "S", "Sort");
+                drawKeyHint(kx, SCREEN_H - 1, "TAB", "Chuyen Tab");
+
             }
         } else if (currentTab == 2) {
-            screen.writeStr(1, SCREEN_H - 1, "F1:Muon  F2:Tra  F3:Mat Sach  |  TAB:Doi Tab  <- ->:Truong  F:Tim  S:Sort  ESC:Thoat", C_KEYCAP);
+            drawKeyHint(kx, SCREEN_H - 1, "F1", "Muon");
+            drawKeyHint(kx, SCREEN_H - 1, "F2", "Tra");
+            drawKeyHint(kx, SCREEN_H - 1, "F3", "Mat");
+            drawKeyHint(kx, SCREEN_H - 1, "F", "Tim");
+            drawKeyHint(kx, SCREEN_H - 1, "S", "Sort");
+            drawKeyHint(kx, SCREEN_H - 1, "TAB", "Chuyen Tab");
         } else if (currentTab == 3) {
-            screen.writeStr(1, SCREEN_H - 1, "TAB:Doi Tab  <- ->:Doi Truong  F:Tim Kiem  S:Sort Truong Chon  ESC:Thoat", C_KEYCAP);
+            drawKeyHint(kx, SCREEN_H - 1, "F", "Tim");
+            drawKeyHint(kx, SCREEN_H - 1, "S", "Sort");
+            drawKeyHint(kx, SCREEN_H - 1, "TAB", "Chuyen Tab");
         } else {
-            screen.writeStr(1, SCREEN_H - 1, "TAB:Doi Tab  <- ->:Doi Truong Tim  F:Tim Kiem  ESC:Thoat", C_KEYCAP);
+            drawKeyHint(kx, SCREEN_H - 1, "F", "Tim");
+            drawKeyHint(kx, SCREEN_H - 1, "TAB", "Chuyen Tab");
         }
     }
 
-    void drawTabs() {
-        const char* tabs[5] = { " 1. DOC GIA ", " 2. DAU SACH ", " 3. MUON/TRA ", " 4. QUA HAN ", " 5. TOP 10 " };
-        int xPos = 2;
-        int tableY = 3;
-        for (int j = 1; j < SCREEN_W - 1; j++) screen.putChar(j, tableY, B_H, C_BORDER);
-        for (int i = 0; i < 5; i++) {
-            int len = (int)strlen(tabs[i]);
-            if (i == currentTab) {
-                screen.putChar(xPos, tableY - 2, B_TL, C_BORDER);
-                for (int j = 0; j < len; j++) screen.putChar(xPos + 1 + j, tableY - 2, B_H, C_BORDER);
-                screen.putChar(xPos + len + 1, tableY - 2, B_TR, C_BORDER);
-                screen.putChar(xPos, tableY - 1, B_V, C_BORDER);
-                screen.writeStr(xPos + 1, tableY - 1, tabs[i], C_TAB_ACTIVE);
-                screen.putChar(xPos + len + 1, tableY - 1, B_V, C_BORDER);
-                screen.putChar(xPos, tableY, B_B, C_BORDER);
-                screen.putChar(xPos + len + 1, tableY, B_B, C_BORDER);
-                for (int j = 0; j < len; j++) screen.putChar(xPos + 1 + j, tableY, ' ', C_APP_BG);
-            } else {
-                screen.writeStr(xPos + 1, tableY - 1, tabs[i], C_TAB_INACTIVE);
-            }
-            xPos += len + 2;
-        }
-    }
+    // =====================================================================
+    // TABS: boc trong khoi bo goc
+    // =====================================================================
+    // Mỗi tab là một khối bo góc riêng biệt
+    // Mỗi tab là một khối bo góc riêng, KHÔNG nền — chỉ viền + chữ
+void drawTabs() {
+    const char* tabs[5] = { "1. DOC GIA", "2. DAU SACH", "3. MUON/TRA", "4. QUA HAN", "5. TOP 10" };
+    int xPos = 2;
+    const int tabH = 2;
+    const int tabY = 1;
 
+    for (int i = 0; i < 5; i++) {
+        int labelLen = (int)strlen(tabs[i]);
+        int boxW = labelLen + 4;
+        bool isActive = (i == currentTab);
+
+        // Không nền: fillAttr = C_APP_BG (nền app), chỉ đổi màu viền + chữ
+        WORD borderAttr = isActive ? C_BRAND : C_BOX_BORDER;
+        WORD fillAttr   = C_APP_BG;
+        WORD textAttr   = isActive ? C_BRAND : C_MUTED;
+
+        screen.drawBox(xPos, tabY, boxW, tabH, fillAttr, borderAttr, "", false);
+        screen.writeStr(xPos + 2, tabY + 1, tabs[i], textAttr);
+
+        xPos += boxW + 2;
+    }
+}
+
+    // =====================================================================
+    // FILTER & SEARCH: label co mau, chip co background
+    // =====================================================================
     void drawFieldAndSearchBars(bool isTyping) {
-        // HO VA TEN (index 1) dung truoc TEN + HO (index 2)
+        screen.drawBox(1, 4, 119, 3, C_APP_BG, C_BOX_BORDER, "BO LOC & TIM KIEM", false, C_BRAND);
+    
         const char* filters0[] = {"MA THE", "HO VA TEN", "TEN + HO", "TEN", "PHAI", "TRANG THAI", "DANG MUON"};
         const char* filters1[] = {"ISBN", "TEN SACH", "TAC GIA", "THE LOAI", "NAM XB", "SO SACH"};
         const char* filters2[] = {"MA THE", "HO TEN", "MA SACH", "TEN SACH", "NGAY MUON", "TINH TRANG"};
         const char* filters3[] = {"MA THE", "HO TEN", "MA SACH", "TEN SACH", "NGAY MUON", "QUA HAN"};
         const char* filters4[] = {"HANG", "ISBN", "TEN DAU SACH", "TAC GIA", "LUOT MUON"};
-
+    
         const char** currentFilters = nullptr;
         if (currentTab == 0) currentFilters = filters0;
         else if (currentTab == 1) currentFilters = filters1;
         else if (currentTab == 2) currentFilters = filters2;
         else if (currentTab == 3) currentFilters = filters3;
         else if (currentTab == 4) currentFilters = filters4;
-
-        int numF   = numFiltersForTab[currentTab];
-        int fIdx   = selectedCol[currentTab];
-        int sIdx   = sortCol[currentTab];
-        char arrow = (sortState[currentTab] == 1) ? '^' : 'v';
-
-        // --- DONG 4: THANH HIEN THI CAC TRUONG ---
-        screen.writeStr(3, 4, "Truong:", C_HEADER);
-        int curX = 11;
-
+    
+        int numF = numFiltersForTab[currentTab];
+        int fIdx = selectedCol[currentTab];
+        int sIdx = sortCol[currentTab];
+        wchar_t arrow = (sortState[currentTab] == 1) ? U_ARR_UP : U_ARR_DN;
+    
+        screen.writeStr(3, 5, "Truong loc <-/->      :", C_LABEL_FILTER);
+        int curX = 27;
+    
         if (currentTab == 1 && viewCategoryTree) {
-            screen.writeStr(curX, 4, "[ CHE DO CAY THE LOAI (Nhan F4 de quay lai bang thuong) ]", C_CATE_HEADER);
+            screen.writeStr(curX, 5, "CHE DO CAY THE LOAI (Nhan F4 de quay lai)", C_BRAND);
         } else {
             for (int i = 0; i < numF; i++) {
                 bool isSelected = (i == fIdx);
                 bool isSorted   = (currentTab != 4 && i == sIdx);
-                char chip[50];
+    
+                WORD chipAttr = isSelected ? C_FIELD_SEL_BG : C_FIELD_NORM_BG;
 
-                if (isSorted) sprintf(chip, " %s %c ", currentFilters[i], arrow);
-                else sprintf(chip, " %s ", currentFilters[i]);
+                // Sorted: chu + 2 o trong + arrow + 1 o padding phai
+                // Thuong: chu + 1 o padding moi ben
+                char chip[60];
+                if (isSorted) sprintf(chip, " %s   ", currentFilters[i]);   // 3 dau cach sau chu
+                else          sprintf(chip, " %s ",  currentFilters[i]);
 
-                int chipLen = (int)strlen(chip);
-                WORD chipAttr = isSelected ? C_FIELD_SEL : (isSorted ? C_FIELD_SORT : C_FIELD_NORM);
+                int chipW = (int)strlen(chip);
 
-                if (curX + chipLen < SCREEN_W - 3) {
-                    screen.writeStr(curX, 4, chip, chipAttr);
-                    curX += chipLen + 1;
+                screen.fillRect(curX, 5, chipW, 1, chipAttr);   // to nen
+                screen.writeStr(curX, 5, chip, chipAttr);        // ghi chu
+
+                if (isSorted) {
+                    int arrowPos = curX + chipW - 2;             // arrow cach mep phai 1 o
+                    screen.putWChar(arrowPos, 5, arrow, chipAttr);
                 }
+
+                curX += chipW + 1;
             }
         }
-
-        // --- DONG 5: THANH TIM KIEM ---
+    
+        // Search — giữ nguyên
+        // Search
         if (currentTab == 1 && viewCategoryTree) {
-            screen.writeStr(3, 5, "Tim kiem: <Vo hieu hoa o che do cay the loai>", C_TAB_INACTIVE);
+            screen.writeStr(3, 6, "Tim kiem ", C_LABEL_SEARCH);
+            screen.writeStr(12, 6, "Vo hieu hoa o che do cay the loai", C_MUTED);
         } else {
-            const char* prefix = "Tim theo ";
-            screen.writeStr(3, 5, prefix, isTyping ? C_HEADER : C_TAB_INACTIVE);
-            int curSearchX = 3 + (int)strlen(prefix);
+            screen.writeStr(3, 6, "Tim kiem ", C_LABEL_SEARCH);
+            int curSearchX = 12;
 
-            char fieldBadge[60];
-            sprintf(fieldBadge, "[ %s ]", currentFilters[fIdx]);
-            screen.writeStr(curSearchX, 5, fieldBadge, C_BADGE_OK);
-            curSearchX += (int)strlen(fieldBadge);
+            // Truong dang tim: [TEN TRUONG] - chu xanh, nen mac dinh (nen app)
+            char fieldTag[40];
+            sprintf(fieldTag, "[%s]", currentFilters[selectedCol[currentTab]]);
+            screen.writeStr(curSearchX, 6, fieldTag, C_BADGE_OK);
+            curSearchX += (int)strlen(fieldTag) + 1;
 
-            screen.writeStr(curSearchX, 5, ": ", isTyping ? C_HEADER : C_TAB_INACTIVE);
-            curSearchX += 2;
+            const int BULLET_X = 25;
+            screen.putWChar(BULLET_X, 6, ':', isTyping ? C_BRAND : C_MUTED);
 
-            int inputX = curSearchX;
-            int inputW = 36;
-            WORD attr = isTyping ? C_INPUT_FOCUS : C_INPUT_BG;
-            screen.fillRect(inputX, 5, inputW, 1, attr);
+            // O nhap bat dau co dinh tai cot 40
+            const int INPUT_X = BULLET_X+2;
 
-            if (strlen(searchKeyword[currentTab]) == 0) {
-                screen.writeStr(inputX + 1, 5, isTyping ? "" : "<Nhan F de nhap tu khoa...>", isTyping ? attr : (8 | (attr & 0xF0)));
+            int kwLen = (int)strlen(searchKeyword[currentTab]);
+            if (kwLen == 0) {
+                screen.writeStr(INPUT_X, 6, isTyping ? "" : "Nhan [F] de nhap tu khoa...", C_MUTED);
             } else {
-                screen.writeStr(inputX + 1, 5, searchKeyword[currentTab], attr);
+                screen.writeStr(INPUT_X, 6, searchKeyword[currentTab], C_BRAND);
             }
 
             if (isTyping) {
-                screen.putChar(inputX + 1 + (int)strlen(searchKeyword[currentTab]), 5, '_', attr);
-                screen.writeStr(inputX + inputW + 2, 5, "[ENTER]: Xong  [ESC]: Huy", C_BADGE_WARN);
+                screen.putWChar(INPUT_X + kwLen, 6, L'_', C_BRAND);
+                screen.writeStr(INPUT_X + 38, 6, "[ENTER] Xong   [ESC] Huy", C_BADGE_WARN);
             }
         }
     }
@@ -730,9 +936,9 @@ private:
             if (searchC == 6) LibraryService::checkBorrowStatus(rawArr[i]->data, b, ov);
 
             if (searchC == 0) sprintf(val, "%d", rawArr[i]->data.maThe);
-            else if (searchC == 1) sprintf(val, "%s %s", rawArr[i]->data.ho, rawArr[i]->data.ten); // HO VA TEN
-            else if (searchC == 2) sprintf(val, "%s %s", rawArr[i]->data.ten, rawArr[i]->data.ho); // TEN + HO
-            else if (searchC == 3) strcpy(val, rawArr[i]->data.ten);                               // TEN
+            else if (searchC == 1) sprintf(val, "%s %s", rawArr[i]->data.ho, rawArr[i]->data.ten);
+            else if (searchC == 2) sprintf(val, "%s %s", rawArr[i]->data.ten, rawArr[i]->data.ho);
+            else if (searchC == 3) strcpy(val, rawArr[i]->data.ten);
             else if (searchC == 4) strcpy(val, rawArr[i]->data.phai);
             else if (searchC == 5) strcpy(val, rawArr[i]->data.trangThai == HOAT_DONG ? "Hoat dong" : "Bi khoa");
             else if (searchC == 6) sprintf(val, "%d", b);
@@ -748,18 +954,19 @@ private:
         }
     }
 
+    // visibleRows = 20, grid h = 23 (title + header + divider + 20 rows + bottom)
     void renderTabDocGia(NodeDocGia* arr[], int nDG) {
-        int visibleRows = 19;
+        int visibleRows = 20;
         adjustViewport(nDG, visibleRows);
-        const int colX[6] = { 2, 15, 48, 68, 80, 100 };
-        const int colW[6] = { 11, 31, 18, 10, 18, 19 };
+        const int colX[6] = { 3, 16, 49, 69, 81, 101 };
+        const int colW[6] = { 11, 31, 18, 10, 18, 18 };
         char hBuf[6][50]; const char* headers[6];
         const char* rawHeaders[6] = { "MA THE", "HO VA TEN DEM", "TEN", "PHAI", "TRANG THAI", "DANG MUON" };
         buildHeaders(rawHeaders, 6, 0, hBuf, headers);
-        screen.drawTableGrid(1, 6, 119, 22, colX, 6, headers, nDG, selectedRow);
+        screen.drawTableGrid(1, 8, 119, 23, colX, 6, headers, nDG, selectedRow, scrollOffset, "DANH SACH DOC GIA");
         for (int i = 0; i < visibleRows && (scrollOffset + i) < nDG; i++) {
             int idx = scrollOffset + i;
-            int rowY = 9 + i;
+            int rowY = 11 + i;
             bool isSel = (idx == selectedRow);
             WORD rowAttr = screen.prepareTableRow(1, rowY, 119, idx, colX, 6, isSel);
             char sMa[15]; sprintf(sMa, "%d", arr[idx]->data.maThe);
@@ -772,7 +979,7 @@ private:
             LibraryService::checkBorrowStatus(arr[idx]->data, borrowing, ov);
             char sMuon[15]; sprintf(sMuon, "%d/3 cuon", borrowing);
             screen.writeCell(colX[4] + 1, rowY, colW[4], active ? "Hoat dong" : "Bi khoa", isSel ? C_ROW_SEL : (active ? C_BADGE_OK : C_BADGE_ERR));
-            screen.writeCell(colX[5] + 1, rowY, colW[5], sMuon, isSel ? C_ROW_SEL : (ov ? C_BADGE_ERR : C_ROW_NORM));
+            screen.writeCell(colX[5] + 1, rowY, colW[5], sMuon, isSel ? C_ROW_SEL : (ov ? C_BADGE_ERR : rowAttr));
         }
     }
 
@@ -791,7 +998,6 @@ private:
             if (matchKeyword(val, searchKeyword[1])) arr[nOut++] = rawArr[i];
         }
         if (sortC == 1 && sortState[1] == 1) return;
-
         if (nOut > 1) {
             qsDauSach(arr, 0, nOut - 1, sortC, sortState[1]);
         }
@@ -827,39 +1033,33 @@ private:
     }
 
     void renderTabDauSach(DauSach* arr[], int nDS, DisplayRowDS treeRows[], int nTreeRows) {
-        int visibleRows = 19;
+        int visibleRows = 20;
         if (viewCategoryTree) {
             adjustViewport(nTreeRows, visibleRows);
-            const int colX[5] = { 2, 16, 68, 98, 109 };
-            const int colW[5] = { 12, 50, 28, 9, 10 };
+            const int colX[5] = { 3, 17, 69, 99, 110 };
+            const int colW[5] = { 12, 50, 28, 9, 9 };
             const char* headers[5] = { "ISBN", "THE LOAI / TEN DAU SACH", "TAC GIA", "NAM XB", "SO SACH" };
-            screen.drawTableGrid(1, 6, 119, 22, colX, 5, headers, nTreeRows, selectedRow);
+            screen.drawTableGrid(1, 8, 119, 23, colX, 5, headers, nTreeRows, selectedRow, scrollOffset, "CAY DANH MUC");
             for (int i = 0; i < visibleRows && (scrollOffset + i) < nTreeRows; i++) {
                 int idx = scrollOffset + i;
-                int rowY = 9 + i;
+                int rowY = 11 + i;
                 bool isSel = (idx == selectedRow);
                 WORD rowAttr = screen.prepareTableRow(1, rowY, 119, idx, colX, 5, isSel);
                 DisplayRowDS& item = treeRows[idx];
                 if (item.isCategory) {
                     WORD cateAttr = isSel ? C_CATE_HEADER_SEL : C_CATE_HEADER;
                     char catTitle[100];
-                    sprintf(catTitle, "[+] %s (%d)", item.categoryName, item.countInCate);
-                    screen.writeCell(colX[0] + 1, rowY, colW[0], "------", isSel ? C_ROW_SEL : C_BORDER);
+                    sprintf(catTitle, "[-] %s (%d)", item.categoryName, item.countInCate);
+                    screen.writeCell(colX[0] + 1, rowY, colW[0], "", rowAttr);
                     screen.writeCell(colX[1] + 1, rowY, colW[1], catTitle, cateAttr);
-                    screen.writeCell(colX[2] + 1, rowY, colW[2], "---------------------------", rowAttr);
-                    screen.writeCell(colX[3] + 1, rowY, colW[3], "--------", rowAttr);
-                    screen.writeCell(colX[4] + 1, rowY, colW[4], "--------", rowAttr);
-                    WORD sepAttr = isSel ? C_ROW_SEL : C_BORDER;
-                    for (int c = 0; c < 4; c++) screen.putChar(colX[c + 1] - 1, rowY, B_V, sepAttr);
                 } else {
-                    char branch[150];
-                    if (item.isLastInCategory) sprintf(branch, "  %c%c %s", B_BL, B_H, item.ds->tenSach);
-                    else sprintf(branch, "  %c%c %s", B_L, B_H, item.ds->tenSach);
                     char sNam[10], sQty[10];
                     sprintf(sNam, "%d", item.ds->namXB);
                     sprintf(sQty, "%d", item.ds->soLuongSach);
                     screen.writeCell(colX[0] + 1, rowY, colW[0], item.ds->ISBN, rowAttr);
-                    screen.writeCell(colX[1] + 1, rowY, colW[1], branch, rowAttr);
+                    screen.putWChar(colX[1] + 3, rowY, item.isLastInCategory ? U_BL_TREE : U_L, isSel ? C_ROW_SEL : C_BRAND);
+                    screen.putWChar(colX[1] + 4, rowY, U_H, isSel ? C_ROW_SEL : C_BRAND);
+                    screen.writeCell(colX[1] + 6, rowY, colW[1] - 5, item.ds->tenSach, rowAttr);
                     screen.writeCell(colX[2] + 1, rowY, colW[2], item.ds->tacGia, rowAttr);
                     screen.writeCell(colX[3] + 1, rowY, colW[3], sNam, rowAttr);
                     screen.writeCell(colX[4] + 1, rowY, colW[4], sQty, rowAttr);
@@ -867,14 +1067,14 @@ private:
             }
         } else {
             adjustViewport(nDS, visibleRows);
-            const int colX[6] = { 2, 16, 52, 75, 96, 107 };
-            const int colW[6] = { 12, 34, 21, 19, 9, 11 };
+            const int colX[6] = { 3, 17, 53, 76, 97, 108 };
+            const int colW[6] = { 12, 34, 21, 19, 9, 10 };
             char hBuf[6][50]; const char* headers[6];
             const char* rawHeaders[6] = { "ISBN", "TEN SACH", "TAC GIA", "THE LOAI", "NAM XB", "SO SACH" };
             buildHeaders(rawHeaders, 6, 1, hBuf, headers);
-            screen.drawTableGrid(1, 6, 119, 22, colX, 6, headers, nDS, selectedRow);
+            screen.drawTableGrid(1, 8, 119, 23, colX, 6, headers, nDS, selectedRow, scrollOffset, "DANH SACH DAU SACH");
             for (int i = 0; i < visibleRows && (scrollOffset + i) < nDS; i++) {
-                int idx = scrollOffset + i; int rowY = 9 + i;
+                int idx = scrollOffset + i; int rowY = 11 + i;
                 bool isSel = (idx == selectedRow);
                 WORD rowAttr = screen.prepareTableRow(1, rowY, 119, idx, colX, 6, isSel);
                 char sNam[10]; sprintf(sNam, "%d", arr[idx]->namXB);
@@ -906,22 +1106,21 @@ private:
             if (matchKeyword(val, searchKeyword[2])) arr[nOut++] = rawArr[i];
         }
         if (sortC == 0 && sortState[2] == 1) return;
-
         if (nOut > 1) {
             qsActiveBorrow(arr, 0, nOut - 1, sortC, sortState[2]);
         }
     }
 
     void renderTabMuonTra(ActiveBorrow arr[], int nMT) {
-        int visibleRows = 19; adjustViewport(nMT, visibleRows);
-        const int colX[6] = { 2, 13, 39, 55, 88, 102 };
-        const int colW[6] = { 9, 24, 14, 31, 12, 16 };
+        int visibleRows = 20; adjustViewport(nMT, visibleRows);
+        const int colX[6] = { 3, 14, 40, 56, 89, 103 };
+        const int colW[6] = { 9, 24, 14, 31, 12, 15 };
         char hBuf[6][50]; const char* headers[6];
         const char* rawHeaders[6] = { "MA THE", "HO TEN", "MA SACH", "TEN SACH", "NGAY MUON", "TINH TRANG" };
         buildHeaders(rawHeaders, 6, 2, hBuf, headers);
-        screen.drawTableGrid(1, 6, 119, 22, colX, 6, headers, nMT, selectedRow);
+        screen.drawTableGrid(1, 8, 119, 23, colX, 6, headers, nMT, selectedRow, scrollOffset, "PHIEU DANG MUON");
         for (int i = 0; i < visibleRows && (scrollOffset + i) < nMT; i++) {
-            int idx = scrollOffset + i; int rowY = 9 + i;
+            int idx = scrollOffset + i; int rowY = 11 + i;
             bool isSel = (idx == selectedRow);
             WORD rowAttr = screen.prepareTableRow(1, rowY, 119, idx, colX, 6, isSel);
             char sMa[15], dateStr[20];
@@ -951,21 +1150,24 @@ private:
             else if (searchC == 5) sprintf(val, "%d", rawArr[i].soNgayQuaHan);
             if (matchKeyword(val, searchKeyword[3])) arr[nOut++] = rawArr[i];
         }
+        // Mặc định: cột 5 (QUA HAN) giảm dần — getOverdueList đã sort sẵn theo thứ tự này.
+        // Lọc keyword không làm đảo thứ tự tương đối -> giữ nguyên, khỏi sort lại.
+        if (sortC == 5 && sortState[3] == 2) return;
         if (nOut > 1) {
             qsOverdueRecord(arr, 0, nOut - 1, sortC, sortState[3]);
         }
     }
 
     void renderTabQuaHan(OverdueRecord arr[], int nQH) {
-        int visibleRows = 19; adjustViewport(nQH, visibleRows);
-        const int colX[6] = { 2, 13, 39, 55, 88, 102 };
-        const int colW[6] = { 9, 24, 14, 31, 12, 16 };
+        int visibleRows = 20; adjustViewport(nQH, visibleRows);
+        const int colX[6] = { 3, 14, 40, 56, 89, 103 };
+        const int colW[6] = { 9, 24, 14, 31, 12, 15 };
         char hBuf[6][50]; const char* headers[6];
         const char* rawHeaders[6] = { "MA THE", "HO TEN", "MA SACH", "TEN SACH", "NGAY MUON", "QUA HAN" };
         buildHeaders(rawHeaders, 6, 3, hBuf, headers);
-        screen.drawTableGrid(1, 6, 119, 22, colX, 6, headers, nQH, selectedRow);
+        screen.drawTableGrid(1, 8, 119, 23, colX, 6, headers, nQH, selectedRow, scrollOffset, "DANH SACH QUA HAN");
         for (int i = 0; i < visibleRows && (scrollOffset + i) < nQH; i++) {
-            int idx = scrollOffset + i; int rowY = 9 + i;
+            int idx = scrollOffset + i; int rowY = 11 + i;
             bool isSel = (idx == selectedRow); WORD rowAttr = screen.prepareTableRow(1, rowY, 119, idx, colX, 6, isSel);
             char sMa[15], dStr[20], sOver[20];
             sprintf(sMa, "%d", arr[idx].maThe); sprintf(dStr, "%02d/%02d/%04d", arr[idx].ngayMuon.d, arr[idx].ngayMuon.m, arr[idx].ngayMuon.y);
@@ -991,18 +1193,18 @@ private:
     }
 
     void renderTabTop10(TopRecord arr[], int nT10) {
-        int visibleRows = 19; adjustViewport(nT10, visibleRows);
-        const int colX[5] = { 2, 11, 27, 67, 96 };
-        const int colW[5] = { 7, 14, 38, 27, 22 };
+        int visibleRows = 20; adjustViewport(nT10, visibleRows);
+        const int colX[5] = { 3, 12, 28, 68, 97 };
+        const int colW[5] = { 7, 14, 38, 27, 21 };
         char hBuf[5][50]; const char* headers[5];
         const char* rawHeaders[5] = { "HANG", "ISBN", "TEN DAU SACH", "TAC GIA", "LUOT MUON" };
         buildHeaders(rawHeaders, 5, 4, hBuf, headers);
-        screen.drawTableGrid(1, 6, 119, 22, colX, 5, headers, nT10, selectedRow);
+        screen.drawTableGrid(1, 8, 119, 23, colX, 5, headers, nT10, selectedRow, scrollOffset, "TOP 10 SACH MUON NHIEU NHAT");
         for (int i = 0; i < visibleRows && (scrollOffset + i) < nT10; i++) {
-            int idx = scrollOffset + i; int rowY = 9 + i;
+            int idx = scrollOffset + i; int rowY = 11 + i;
             bool isSel = (idx == selectedRow); WORD rowAttr = screen.prepareTableRow(1, rowY, 119, idx, colX, 5, isSel);
             char sRank[10], sBorrows[25]; sprintf(sRank, "#%d", arr[idx].rank); sprintf(sBorrows, "%d luot", arr[idx].ds->soLuotMuon);
-            screen.writeCell(colX[0] + 1, rowY, colW[0], sRank, isSel ? C_ROW_SEL : C_HEADER);
+            screen.writeCell(colX[0] + 1, rowY, colW[0], sRank, isSel ? C_ROW_SEL : C_BADGE_WARN);
             screen.writeCell(colX[1] + 1, rowY, colW[1], arr[idx].ds->ISBN, rowAttr);
             screen.writeCell(colX[2] + 1, rowY, colW[2], arr[idx].ds->tenSach, rowAttr);
             screen.writeCell(colX[3] + 1, rowY, colW[3], arr[idx].ds->tacGia, rowAttr);
@@ -1010,10 +1212,11 @@ private:
         }
     }
 
+    // Cac dialog giu nguyen (khong doi vi khong lien quan yeu cau)...
     void dialogAddOrEditDocGia(NodeDocGia* editNode = nullptr) {
         const char* labels[4] = { "Ho va ten dem :", "Ten doc gia   :", "Phai (Nam/Nu) :", "Trang thai    :" };
         char values[4][50] = { "", "", "Nam", "Hoat dong" };
-        const int maxLens[4] = { 35, 18, 5, 20 };
+        const int maxLens[4] = { 30, 17, 5, 20 };
         const char* toggleOpts[4] = { "", "", "Nam,Nu", "Hoat dong,Bi khoa" };
         int newKey = editNode ? editNode->data.maThe : service.generateReaderKey();
         if (editNode) {
@@ -1045,7 +1248,7 @@ private:
     void dialogAddDauSach() {
         const char* labels[5] = { "Ma ISBN (978...):", "Ten sach        :", "Tac gia         :", "The loai        :", "So trang        :" };
         char values[5][50] = { "", "", "", "", "" };
-        const int maxLens[5] = { 12, 40, 30, 25, 6 };
+        const int maxLens[5] = { 12, 35, 35, 35, 6 };
         if (screen.showFormDialog("THEM DAU SACH", labels, values, maxLens, 5)) {
             DauSach* ds = new DauSach;
             strcpy(ds->ISBN, values[0]);
@@ -1058,7 +1261,7 @@ private:
             ds->soLuongSach = 0;
             ds->soLuotMuon = 0;
             if (!service.insertDauSach(ds)) {
-                delete ds; screen.showMessage("Loi: Trung ma ISBN!");
+                delete ds; screen.showMessage("Loi: Trung ma ISBN!", true);
             }
         }
     }
@@ -1086,9 +1289,12 @@ private:
         const char* labels[2] = { "Ma The :", "Ma Sach:" }; char values[2][50] = { "", "" }; const int maxLens[2] = { 10, 22 };
         if (screen.showFormDialog(titles[mode], labels, values, maxLens, 2)) {
             const char* res = (mode == 0) ? service.borrowBook(atoi(values[0]), values[1]) : service.returnBook(atoi(values[0]), values[1], mode);
-            if (strcmp(res, "OK") == 0) screen.showMessage("Thanh cong!"); else screen.showMessage(res, true);
+            if (strcmp(res, "OK") != 0) screen.showMessage(res, true);
         }
     }
+
+    // (Cac dialog renderDialogChiTietSach / DocGia / TraCuu giu nguyen, khong in ra day de tiet kiem)
+    // ... copy nguyen tu file goc ...
 
     void renderDialogChiTietSach(DauSach* ds) {
         if (!ds) return;
@@ -1097,7 +1303,7 @@ private:
             NodeSach* arr[500]; int count = 0;
             NodeSach* p = ds->dms;
             while (p && count < 500) { arr[count++] = p; p = p->next; }
-            int visibleRows = 12;
+            int visibleRows = 11;
             if (count <= 0) { selRow = 0; scrOffset = 0; }
             else {
                 if (selRow < 0) selRow = 0;
@@ -1108,31 +1314,28 @@ private:
             int boxW = 82, boxH = 22;
             int startX = (SCREEN_W - boxW) / 2;
             int startY = (SCREEN_H - boxH) / 2;
-            screen.drawBox(startX, startY, boxW, boxH, C_DLG_BG, C_DLG_BG, "CHI TIET SACH");
+            screen.drawBox(startX, startY, boxW, boxH, C_DLG_BG, C_DLG_BORDER, "CHI TIET SACH");
             char titleInfo[150];
-            sprintf(titleInfo, "Dau sach: %s | So trang: %d | Tong so cuon: %d", ds->tenSach, ds->soTrang, ds->soLuongSach);
-            screen.writeStr(startX + 3, startY + 2, titleInfo, C_DLG_BG);
-            const int colX[3] = { startX + 3, startX + 22, startX + 44 };
-            const int colW[3] = { 18, 21, 34 };
+            sprintf(titleInfo, "Dau sach: %s  |  So trang: %d  |  Tong so cuon: %d", ds->tenSach, ds->soTrang, ds->soLuongSach);
+            screen.writeStr(startX + 3, startY + 2, titleInfo, C_ROW_NORM);
+            const int colX[3] = { startX + 4, startX + 23, startX + 45 };
+            const int colW[3] = { 18, 21, 33 };
             const char* headers[3] = { "MA SACH", "TRANG THAI", "VI TRI KE SACH" };
             int tableX = startX + 2; int tableY = startY + 4; int tableW = boxW - 4; int tableH = 14;
-            screen.drawTableGrid(tableX, tableY, tableW, tableH, colX, 3, headers, count, selRow);
+            screen.drawTableGrid(tableX, tableY, tableW, tableH, colX, 3, headers, count, selRow, scrOffset, "DANH MUC BAN SAO");
             for (int i = 0; i < visibleRows && (scrOffset + i) < count; i++) {
                 int idx = scrOffset + i; int rowY = tableY + 3 + i;
                 bool isSel = (idx == selRow);
-                WORD rowAttr = isSel ? C_ROW_SEL : C_ROW_NORM;
-                WORD sepAttr = isSel ? C_ROW_SEL : C_BORDER;
-                screen.fillRect(tableX + 1, rowY, tableW - 1, 1, rowAttr);
-                screen.putChar(colX[1] - 1, rowY, B_V, sepAttr); screen.putChar(colX[2] - 1, rowY, B_V, sepAttr);
+                WORD rowAttr = screen.prepareTableRow(tableX, rowY, tableW, idx, colX, 3, isSel);
                 screen.writeCell(colX[0], rowY, colW[0], arr[idx]->data.maSach, rowAttr);
                 const char* ttStr = "Cho muon duoc";
-                if (arr[idx]->data.trangThai == DA_CHO_MUON) ttStr = "Da muon";
-                else if (arr[idx]->data.trangThai == DA_THANH_LY) ttStr = "Da thanh ly";
-                screen.writeCell(colX[1], rowY, colW[1], ttStr, rowAttr);
+                WORD stAttr = isSel ? C_ROW_SEL : C_BADGE_OK;
+                if (arr[idx]->data.trangThai == DA_CHO_MUON) { ttStr = "Da muon"; stAttr = isSel ? C_ROW_SEL : C_BADGE_WARN; }
+                else if (arr[idx]->data.trangThai == DA_THANH_LY) { ttStr = "Da thanh ly"; stAttr = isSel ? C_ROW_SEL : C_BADGE_ERR; }
+                screen.writeCell(colX[1], rowY, colW[1], ttStr, stAttr);
                 screen.writeCell(colX[2], rowY, colW[2], arr[idx]->data.viTri, rowAttr);
-                screen.putChar(tableX, rowY, B_V, C_BORDER); screen.putChar(tableX + tableW, rowY, B_V, C_BORDER);
             }
-            screen.writeStr(startX + 2, startY + boxH - 2, "F1:Them  F2:Sua VTri  F3:Xoa  F4:Thanh ly  ESC:Dong", C_DLG_BG);
+            screen.writeStr(startX + 3, startY + boxH - 2, "[F1] Them  [F2] Sua VTri  [F3] Xoa  [F4] Thanh ly  [ESC] Dong", C_MUTED);
             screen.render();
             int ch = _getch();
             if (ch == KEY_ESC) break;
@@ -1150,21 +1353,21 @@ private:
                     }
                 }
                 else if (ext == KEY_F2 && count > 0) {
-                    if (arr[selRow]->data.trangThai == DA_CHO_MUON) { screen.showMessage("Khong the sua vi sach dang duoc muon!"); continue; }
-                    if (arr[selRow]->data.trangThai == DA_THANH_LY) { screen.showMessage("Sach da thanh ly, khong the doi vi tri!"); continue; }
+                    if (arr[selRow]->data.trangThai == DA_CHO_MUON) { screen.showMessage("Khong the sua vi sach dang duoc muon!", true); continue; }
+                    if (arr[selRow]->data.trangThai == DA_THANH_LY) { screen.showMessage("Sach da thanh ly, khong the doi vi tri!", true); continue; }
                     const char* lb[1] = { "Vi tri ke:" }; char val[1][50]; strcpy(val[0], arr[selRow]->data.viTri); const int ml[1] = { 25 };
                     if (screen.showFormDialog("HIEU CHINH VI TRI SACH", lb, val, ml, 1)) strcpy(arr[selRow]->data.viTri, val[0]);
                 }
                 else if (ext == KEY_F3 && count > 0) {
-                    if (arr[selRow]->data.trangThai == DA_CHO_MUON) { screen.showMessage("Khong the xoa vi sach dang duoc muon!"); continue; }
+                    if (arr[selRow]->data.trangThai == DA_CHO_MUON) { screen.showMessage("Khong the xoa vi sach dang duoc muon!", true); continue; }
                     if (screen.showConfirm("Xac nhan xoa cuon sach nay?")) {
                         if (service.removeSachVatLy(ds, arr[selRow]->data.maSach)) {
                             if (selRow >= count - 1 && selRow > 0) selRow--;
-                        } else screen.showMessage("Loi khi xoa sach!");
+                        } else screen.showMessage("Loi khi xoa sach!", true);
                     }
                 } else if (ext == KEY_F4 && count > 0) {
-                    if (arr[selRow]->data.trangThai == DA_CHO_MUON) { screen.showMessage("Khong the thanh ly vi sach dang duoc muon!"); continue; }
-                    if (arr[selRow]->data.trangThai == DA_THANH_LY) { screen.showMessage("Sach nay da duoc thanh ly roi!"); continue; }
+                    if (arr[selRow]->data.trangThai == DA_CHO_MUON) { screen.showMessage("Khong the thanh ly vi sach dang duoc muon!", true); continue; }
+                    if (arr[selRow]->data.trangThai == DA_THANH_LY) { screen.showMessage("Sach nay da duoc thanh ly roi!", true); continue; }
                     if (screen.showConfirm("Xac nhan THANH LY cuon sach nay?")) {
                         arr[selRow]->data.trangThai = DA_THANH_LY; strcpy(arr[selRow]->data.viTri, "");
                     }
@@ -1181,7 +1384,7 @@ private:
             NodeMuonTra* arr[500]; int count = 0;
             NodeMuonTra* p = dg->data.dsMuonTra;
             while (p && count < 500) { arr[count++] = p; p = p->next; }
-            int visibleRows = 12;
+            int visibleRows = 11;
             if (count <= 0) { selRow = 0; scrOffset = 0; }
             else {
                 if (selRow < 0) selRow = 0;
@@ -1192,24 +1395,21 @@ private:
             int boxW = 106, boxH = 22;
             int startX = (SCREEN_W - boxW) / 2;
             int startY = (SCREEN_H - boxH) / 2;
-            screen.drawBox(startX, startY, boxW, boxH, C_DLG_BG, C_DLG_BG, "CHI TIET DOC GIA - LICH SU MUON TRA");
+            screen.drawBox(startX, startY, boxW, boxH, C_DLG_BG, C_DLG_BORDER, "CHI TIET DOC GIA");
             char titleInfo[100];
-            sprintf(titleInfo, "Doc gia: %d - %s %s | Trang thai: %s", dg->data.maThe, dg->data.ho, dg->data.ten,
+            sprintf(titleInfo, "Doc gia: %d - %s %s  |  Trang thai: %s", dg->data.maThe, dg->data.ho, dg->data.ten,
                     dg->data.trangThai == HOAT_DONG ? "Hoat dong" : "Bi khoa");
-            screen.writeStr(startX + 3, startY + 2, titleInfo, C_DLG_BG);
-            const int colX[5] = { startX + 3, startX + 17, startX + 61, startX + 75, startX + 89 };
-            const int colW[5] = { 13, 43, 13, 13, 13 };
+            screen.writeStr(startX + 3, startY + 2, titleInfo, C_ROW_NORM);
+            const int colX[5] = { startX + 4, startX + 18, startX + 62, startX + 76, startX + 90 };
+            const int colW[5] = { 13, 43, 13, 13, 12 };
             const char* headers[5] = { "MA SACH", "TEN SACH", "NGAY MUON", "NGAY TRA", "TRANG THAI" };
             int tableX = startX + 2; int tableY = startY + 4; int tableW = boxW - 4; int tableH = 14;
-            screen.drawTableGrid(tableX, tableY, tableW, tableH, colX, 5, headers, count, selRow);
+            screen.drawTableGrid(tableX, tableY, tableW, tableH, colX, 5, headers, count, selRow, scrOffset, "LICH SU MUON TRA");
             Date today = getCurrentDate();
             for (int i = 0; i < visibleRows && (scrOffset + i) < count; i++) {
                 int idx = scrOffset + i; int rowY = tableY + 3 + i;
                 bool isSel = (idx == selRow);
-                WORD rowAttr = isSel ? C_ROW_SEL : C_ROW_NORM;
-                WORD sepAttr = isSel ? C_ROW_SEL : C_BORDER;
-                screen.fillRect(tableX + 1, rowY, tableW - 1, 1, rowAttr);
-                for (int c = 1; c < 5; c++) screen.putChar(colX[c] - 1, rowY, B_V, sepAttr);
+                WORD rowAttr = screen.prepareTableRow(tableX, rowY, tableW, idx, colX, 5, isSel);
                 screen.writeCell(colX[0], rowY, colW[0], arr[idx]->data.maSach, rowAttr);
                 NodeSach* ns = nullptr;
                 DauSach* ds = service.findDauSachByMaSach(arr[idx]->data.maSach, ns);
@@ -1221,16 +1421,15 @@ private:
                 screen.writeCell(colX[2], rowY, colW[2], nm, rowAttr);
                 screen.writeCell(colX[3], rowY, colW[3], nt, rowAttr);
                 const char* ttStr = "Dang muon";
-                WORD statusAttr = rowAttr;
-                if (arr[idx]->data.trangThai == DA_TRA) ttStr = "Da tra";
+                WORD statusAttr = isSel ? C_ROW_SEL : C_BADGE_OK;
+                if (arr[idx]->data.trangThai == DA_TRA) { ttStr = "Da tra"; statusAttr = rowAttr; }
                 else if (arr[idx]->data.trangThai == LAM_MAT) { ttStr = "Mat sach"; statusAttr = isSel ? C_ROW_SEL : C_BADGE_ERR; }
                 else if (arr[idx]->data.trangThai == DANG_MUON) {
                     if (daysBetween(arr[idx]->data.ngayMuon, today) > 7) { ttStr = "! Qua han"; statusAttr = isSel ? C_ROW_SEL : C_BADGE_ERR; }
                 }
                 screen.writeCell(colX[4], rowY, colW[4], ttStr, statusAttr);
-                screen.putChar(tableX, rowY, B_V, C_BORDER); screen.putChar(tableX + tableW, rowY, B_V, C_BORDER);
             }
-            screen.writeStr(startX + 3, startY + boxH - 2, "[Up/Down]: Cuon danh sach  |  [ESC]: Dong", C_DLG_BG);
+            screen.writeStr(startX + 3, startY + boxH - 2, "[Up/Down] Cuon danh sach   [ESC] Dong", C_MUTED);
             screen.render();
             int ch = _getch();
             if (ch == KEY_ESC) break;
@@ -1251,24 +1450,47 @@ private:
             NodeSach* bookNode = nullptr;
             DauSach* ds = service.findDauSachByMaSach(values[0], bookNode);
             if (ds && bookNode) {
-                int boxW = 60, boxH = 12;
+                int boxW = 66, boxH = 12;
                 int startX = (SCREEN_W - boxW) / 2;
                 int startY = (SCREEN_H - boxH) / 2;
-                screen.drawBox(startX, startY, boxW, boxH, C_DLG_BG, C_DLG_BG, "KET QUA TRA CUU");
-                char buf1[100], buf2[100], buf3[100], buf4[100];
-                sprintf(buf1, "- Ma Sach    : %s", bookNode->data.maSach);
-                sprintf(buf2, "- Dau Sach   : %s", ds->tenSach);
-                sprintf(buf3, "- Vi tri ke  : %s", bookNode->data.viTri);
+                screen.drawBox(startX, startY, boxW, boxH, C_DLG_BG, C_DLG_BORDER, "KET QUA TRA CUU");
+            
                 const char* status = "Cho muon duoc";
-                if (bookNode->data.trangThai == DA_CHO_MUON) status = "Dang duoc muon";
-                else if (bookNode->data.trangThai == DA_THANH_LY) status = "Da thanh ly";
-                sprintf(buf4, "- Trang thai : %s", status);
-                screen.writeStr(startX + 3, startY + 3, buf1, C_DLG_BG);
-                screen.writeStr(startX + 3, startY + 5, buf2, C_DLG_BG);
-                screen.writeStr(startX + 3, startY + 7, buf3, C_DLG_BG);
-                WORD statusColor = (bookNode->data.trangThai == CHO_MUON_DUOC) ? C_BADGE_OK : C_BADGE_ERR;
-                screen.writeStr(startX + 3, startY + 9, buf4, statusColor | (C_DLG_BG & 0xF0));
-                screen.writeStr(startX + 15, startY + boxH - 2, " [ ENTER / ESC de dong ] ", C_DLG_BG);
+                WORD statusColor = C_BADGE_OK;
+                if (bookNode->data.trangThai == DA_CHO_MUON) { status = "Dang duoc muon"; statusColor = C_BADGE_WARN; }
+                else if (bookNode->data.trangThai == DA_THANH_LY) { status = "Da thanh ly"; statusColor = C_BADGE_ERR; }
+            
+                char line[160];
+                int y = startY + 2;
+                const int LX = startX + 3;
+                const int VX = startX + 16;
+            
+                screen.writeStr(LX, y, "Ma ISBN    :", C_MUTED);
+                screen.writeStr(VX, y, ds->ISBN, C_ROW_NORM); y++;
+            
+                screen.writeStr(LX, y, "Ten sach   :", C_MUTED);
+                screen.writeStr(VX, y, ds->tenSach, C_ROW_NORM); y++;
+            
+                screen.writeStr(LX, y, "Tac gia    :", C_MUTED);
+                screen.writeStr(VX, y, ds->tacGia, C_ROW_NORM); y++;
+            
+                screen.writeStr(LX, y, "Nam XB     :", C_MUTED);
+                sprintf(line, "%d", ds->namXB);
+                screen.writeStr(VX, y, line, C_ROW_NORM); y++;
+            
+                screen.writeStr(LX, y, "The loai   :", C_MUTED);
+                screen.writeStr(VX, y, ds->theLoai, C_ROW_NORM); y++;
+            
+                screen.writeStr(LX, y, "Ma sach    :", C_MUTED);
+                screen.writeStr(VX, y, bookNode->data.maSach, C_ROW_NORM); y++;
+            
+                screen.writeStr(LX, y, "Vi tri ke  :", C_MUTED);
+                screen.writeStr(VX, y, strlen(bookNode->data.viTri) ? bookNode->data.viTri : "-", C_ROW_NORM); y++;
+            
+                screen.writeStr(LX, y, "Trang thai :", C_MUTED);
+                screen.writeStr(VX, y, status, statusColor);
+            
+                screen.writeStr(startX + 18, startY + boxH - 2, "[ ENTER / ESC de dong ]", C_MUTED);
                 screen.render();
                 int ch; while ((ch = _getch()) != KEY_ESC && ch != KEY_ENTER);
                 screen.clear();
@@ -1278,7 +1500,7 @@ private:
 
 public:
     LibraryTUI(LibraryService& srv) : service(srv) {
-        screen.init("LIBRARY TUI");
+        screen.init("LIB-OS // Modern Library Management");
         allocBuffers();
     }
 
@@ -1287,14 +1509,13 @@ public:
     void run() {
         bool isSearching = false;
         char backupKeyword[50] = "";
-        bool needUpdateData = true; 
-        
+        bool needUpdateData = true;
+
         int nDG = 0, nDS = 0, nTreeRows = 0, nMT = 0, nQH = 0, nT10 = 0;
         int nDGRaw = 0, nDSRaw = 0;
 
         while (true) {
             if (needUpdateData) {
-                // TEN + HO (index 2) va TEN (index 3) deu xep theo Ten truoc -> Ho dem sau
                 bool sortByNameInService = (currentTab == 0 && (sortCol[0] == 2 || sortCol[0] == 3) && sortState[0] == 1);
                 service.getReadersList(bufDgArrRaw, nDGRaw, sortByNameInService);
                 service.getBooksList(bufDsViewRaw, nDSRaw, false);
@@ -1343,7 +1564,7 @@ public:
                     }
                     filterTop10(bufTrRaw, cnt, bufTrArr, nT10);
                 }
-                
+
                 needUpdateData = false;
             }
 
@@ -1356,15 +1577,6 @@ public:
             else if (currentTab == 2) renderTabMuonTra(bufMtArr, nMT);
             else if (currentTab == 3) renderTabQuaHan(bufQhArr, nQH);
             else if (currentTab == 4) renderTabTop10(bufTrArr, nT10);
-
-            screen.putChar(1, 3, B_TL, C_BORDER);
-            screen.putChar(SCREEN_W - 2, 3, B_TR, C_BORDER);
-            screen.putChar(1, 4, B_V, C_BORDER);
-            screen.putChar(SCREEN_W - 2, 4, B_V, C_BORDER);
-            screen.putChar(1, 5, B_V, C_BORDER);
-            screen.putChar(SCREEN_W - 2, 5, B_V, C_BORDER);
-            screen.putChar(1, 6, B_L, C_BORDER);
-            screen.putChar(SCREEN_W - 2, 6, B_R, C_BORDER);
 
             screen.render();
             int ch = _getch();
@@ -1403,12 +1615,11 @@ public:
                         else if (ext == KEY_F3 && nDG > 0) {
                             if (screen.showConfirm("Xac nhan xoa doc gia nay?")) {
                                 bool ok = service.removeDocGia(bufDgArr[selectedRow]->data.maThe);
-                                screen.showMessage(ok ? "Da xoa!" : "Loi: Doc gia dang muon sach!");
+                                screen.showMessage(ok ? "Da xoa!" : "Loi: Doc gia dang muon sach!", !ok);
                                 needUpdateData = true;
                             }
                         }
                         else if (ext == KEY_F4) {
-                            // Chuyen nhanh qua lai giua TEN + HO (index 2) va MA THE (index 0)
                             if ((sortCol[0] == 2 || sortCol[0] == 3) && sortState[0] == 1) {
                                 sortCol[0] = 0;
                                 selectedCol[0] = 0;
@@ -1465,7 +1676,18 @@ public:
                     if (len > 0) { searchKeyword[currentTab][len - 1] = '\0'; keywordChanged = true; }
                 } else if (ch >= 32 && ch <= 126) {
                     int len = (int)strlen(searchKeyword[currentTab]);
-                    if (len < 38) { searchKeyword[currentTab][len] = (char)ch; searchKeyword[currentTab][len + 1] = '\0'; keywordChanged = true; }
+                    if (len < 38) {
+                        bool isSpace = (ch == ' ');
+                        bool lastIsSpace = (len > 0 && searchKeyword[currentTab][len - 1] == ' ');
+                        // Chan: space dau tien HOAC 2 space lien tiep
+                        if (isSpace && (len == 0 || lastIsSpace)) {
+                            // Bo qua
+                        } else {
+                            searchKeyword[currentTab][len] = (char)ch;
+                            searchKeyword[currentTab][len + 1] = '\0';
+                            keywordChanged = true;
+                        }
+                    }
                 }
 
                 if (!(currentTab == 1 && viewCategoryTree)) {
