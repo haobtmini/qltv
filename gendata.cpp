@@ -1,4 +1,4 @@
-// gendata.cpp — Gen 100.000 độc giả, 100 đầu sách, 10–50 cuốn/đầu sách
+// gendata.cpp — Gen 100.000 độc giả KHÔNG TRÙNG HỌ VÀ TÊN, 100 đầu sách, 10–50 cuốn/đầu sách
 // Build: g++ -std=c++17 -O2 gendata.cpp -o gendata
 // Run:   ./gendata
 
@@ -7,64 +7,84 @@
 #include <ctime>
 #include <cstdio>
 #include <cstring>
-#include <string>
 
 // ==================== CẤU HÌNH ====================
-static const int NUM_DOCGIA   = 100000;    // ← 10^5
-static const int NUM_DAUSACH  = 100;
-static const int MIN_SACH     = 10;
-static const int MAX_SACH     = 50;
+static const int    NUM_DOCGIA      = 100000;
+static const int    NUM_DAUSACH     = 100;
+static const int    MIN_SACH        = 10;
+static const int    MAX_SACH        = 50;
 static const double RATIO_CO_MUON   = 0.35;
 static const int    MAX_MUON_PER_DG = 3;
-static const double RATIO_DANG_MUON = 0.15;
+static const double RATIO_DANG_MUON = 0.25;
 
-// ==================== DỮ LIỆU MẪU ====================
+// ==================== DỮ LIỆU MẪU ĐỘC GIẢ (35 Họ * 30 Đệm * 100 Tên = 105.000 tổ hợp duy nhất) ====================
 static const char* HO[] = {
     "Nguyen","Tran","Le","Pham","Hoang","Huynh","Phan","Vu","Vo","Dang",
-    "Bui","Do","Ho","Ngo","Duong","Ly","Truong","Dinh","Lam","Mai"
+    "Bui","Do","Ho","Ngo","Duong","Ly","Truong","Dinh","Lam","Mai",
+    "Trinh","Dao","Doan","Vuong","Ton","Luong","Thai","Ta","Chau","Quach",
+    "Phung","Ha","Tang","Mac","Kieu"
 };
-static const int N_HO = sizeof(HO)/sizeof(HO[0]);
+static const int N_HO = sizeof(HO) / sizeof(HO[0]); // 35
 
+// 15 Đệm Nam + 15 Đệm Nữ = 30 Đệm
+static const char* DEM_NAM[] = {
+    "Van","Huu","Duc","Minh","Quang","Hoang","Gia","Quoc","Thanh","Tuan",
+    "Bao","Anh","Cong","Duy","Ngoc"
+};
+static const int N_DEM_NAM = sizeof(DEM_NAM) / sizeof(DEM_NAM[0]); // 15
+
+static const char* DEM_NU[] = {
+    "Thi","Ngoc","Thu","Thanh","Minh","Phuong","Hong","Kim","My","Bao",
+    "Anh","Thuy","Khanh","Hoai","Dieu"
+};
+static const int N_DEM_NU = sizeof(DEM_NU) / sizeof(DEM_NU[0]); // 15
+
+// 50 Tên Nam + 50 Tên Nữ = 100 Tên
 static const char* TEN_NAM[] = {
     "An","Bao","Cuong","Dung","Duc","Hai","Hieu","Hoang","Hung","Huy",
     "Khang","Kien","Long","Minh","Nam","Nghia","Phong","Phuc","Quan","Quang",
-    "Son","Tai","Tam","Thanh","Thang","Thinh","Thong","Tien","Toan","Trung"
+    "Son","Tai","Tam","Thanh","Thang","Thinh","Thong","Tien","Toan","Trung",
+    "Tuan","Tu","Tung","Viet","Vinh","Vu","Dat","Duy","Giang","Hao",
+    "Hiep","Khoa","Lam","Linh","Loc","Manh","Nhat","Phat","Sang","Tri"
 };
-static const int N_TEN_NAM = sizeof(TEN_NAM)/sizeof(TEN_NAM[0]);
+static const int N_TEN_NAM = sizeof(TEN_NAM) / sizeof(TEN_NAM[0]); // 50
 
 static const char* TEN_NU[] = {
     "Anh","Bich","Chau","Chi","Diep","Dung","Giang","Ha","Hanh","Hoa",
     "Hue","Huong","Lan","Linh","Loan","Mai","My","Nga","Ngan","Ngoc",
-    "Nhi","Nhung","Oanh","Phuong","Quynh","Tam","Thao","Thi","Thu","Thuy"
+    "Nhi","Nhung","Oanh","Phuong","Quynh","Tam","Thao","Thi","Thu","Thuy",
+    "Tien","Tram","Trang","Trinh","Truc","Tu","Tuyen","Tuyet","Uyen","Van",
+    "Vi","Vy","Xuan","Yen","Han","Khanh","Ly","Nhu","Suong","Thuyet"
 };
-static const int N_TEN_NU = sizeof(TEN_NU)/sizeof(TEN_NU[0]);
+static const int N_TEN_NU = sizeof(TEN_NU) / sizeof(TEN_NU[0]); // 50
 
+// ==================== DỮ LIỆU MẪU ĐẦU SÁCH ====================
 static const char* THE_LOAI[] = {
     "Van hoc","Khoa hoc","Lich su","Dia ly","Toan hoc","Vat ly","Hoa hoc",
     "Sinh hoc","Triet hoc","Kinh te","Tam ly","Ky nang song","Cong nghe",
     "Tin hoc","Nghe thuat","Ton giao","Chinh tri","Giao duc","The thao","Am nhac"
 };
-static const int N_THE_LOAI = sizeof(THE_LOAI)/sizeof(THE_LOAI[0]);
+static const int N_THE_LOAI = sizeof(THE_LOAI) / sizeof(THE_LOAI[0]);
 
 static const char* TINH_TU[] = {
     "Co dai","Hien dai","Viet Nam","The gioi","Nhap mon","Nang cao",
     "Thuc hanh","Ly thuyet","Toan dien","Chuyen sau","Can ban","Ung dung",
     "Thu vi","Hap dan","Ky ao","Lich su","Tuong lai","Song ngu"
 };
-static const int N_TINH_TU = sizeof(TINH_TU)/sizeof(TINH_TU[0]);
+static const int N_TINH_TU = sizeof(TINH_TU) / sizeof(TINH_TU[0]);
 
 static const char* DANH_TU_SACH[] = {
     "Hanh trinh","Kham pha","Bai hoc","Cau chuyen","The gioi","Tu duy",
     "Ky nang","Phuong phap","Nghe thuat","Khoa hoc","Lich su","Van hoa",
     "Con nguoi","Cuoc song","Tuong lai","Tri thuc","Nhan thuc","Giao duc"
 };
-static const int N_DANH_TU = sizeof(DANH_TU_SACH)/sizeof(DANH_TU_SACH[0]);
+static const int N_DANH_TU = sizeof(DANH_TU_SACH) / sizeof(DANH_TU_SACH[0]);
 
 static const char* TAC_GIA_HO[] = {
     "Nguyen Van","Tran Thi","Le Quang","Pham Minh","Hoang Anh",
     "Vu Duc","Dang Thu","Bui Xuan","Do Hai","Ngo Bao"
 };
-static const int N_TG_HO = sizeof(TAC_GIA_HO)/sizeof(TAC_GIA_HO[0]);
+static const int N_TG_HO = sizeof(TAC_GIA_HO) / sizeof(TAC_GIA_HO[0]);
 
 // ==================== TIỆN ÍCH ====================
 static int randRange(int lo, int hi) { return lo + rand() % (hi - lo + 1); }
@@ -72,178 +92,161 @@ static double randDouble() { return (double)rand() / ((double)RAND_MAX + 1.0); }
 static bool randChance(double p) { return randDouble() < p; }
 static const char* pick(const char* arr[], int n) { return arr[rand() % n]; }
 
-// Date helper — KHÔNG dựa vào models.h để tránh phụ thuộc
-struct SimpleDate { int d, m, y; };
-static SimpleDate genPastDate(int minDaysAgo, int maxDaysAgo) {
-    time_t now = time(nullptr);
-    int daysAgo = randRange(minDaysAgo, maxDaysAgo);
-    time_t t = now - (time_t)daysAgo * 86400;
+static Date genDateOffset(int daysOffset) {
+    time_t t = time(nullptr) + (time_t)daysOffset * 86400;
     struct tm* tm = localtime(&t);
-    SimpleDate r; r.d = tm->tm_mday; r.m = tm->tm_mon + 1; r.y = tm->tm_year + 1900;
-    return r;
-}
-static SimpleDate genDateAfterDaysAgo(int daysAgo, int plusDays) {
-    time_t now = time(nullptr);
-    time_t t = now - (time_t)daysAgo * 86400 + (time_t)plusDays * 86400;
-    struct tm* tm = localtime(&t);
-    SimpleDate r; r.d = tm->tm_mday; r.m = tm->tm_mon + 1; r.y = tm->tm_year + 1900;
-    return r;
+    return { tm->tm_mday, tm->tm_mon + 1, tm->tm_year + 1900 };
 }
 
 // ==================== MAIN ====================
 int main() {
-    // ✅ Fix codepage trên Windows để hiển thị đúng (không bị rác)
 #ifdef _WIN32
-    system("chcp 437 > nul");   // logic.h dùng CP437 cho khung
+    system("chcp 437 > nul");
 #endif
-
     srand((unsigned)time(nullptr));
 
-    printf("=== GEN DATA THU VIEN ===\n");
-    printf("Doc gia  : %d\n", NUM_DOCGIA);
+    const int TOTAL_DEM = N_DEM_NAM + N_DEM_NU; // 30
+    const int TOTAL_TEN = N_TEN_NAM + N_TEN_NU; // 100
+    const long long TOTAL_COMBOS = (long long)N_HO * TOTAL_DEM * TOTAL_TEN; // 105.000
+
+    // Hệ số nguyên tố cùng nhau với 105.000 (105000 = 2^4 * 3 * 5^4 * 7)
+    // Chọn STEP không chia hết cho 2, 3, 5, 7 -> tạo song ánh (bijection) 1-1 không bao giờ trùng
+    const long long STEP = 31337;
+    const long long SEED = rand() % TOTAL_COMBOS;
+
+    printf("=== GEN DATA THU VIEN (100%% KHONG TRUNG HO & TEN) ===\n");
+    printf("Doc gia  : %d (To hop toi da: %lld)\n", NUM_DOCGIA, TOTAL_COMBOS);
     printf("Dau sach : %d\n", NUM_DAUSACH);
     printf("Sach/dau : %d - %d\n\n", MIN_SACH, MAX_SACH);
 
     LibraryService svc;
     svc.clearData();
 
-    // ---------- 1. ĐẦU SÁCH ----------
+    // ---------- 1. ĐẦU SÁCH & DANH MỤC SÁCH ----------
     printf("[1/3] Tao %d dau sach...\n", NUM_DAUSACH);
-
-    // ✅ Mảng động C-style (không vector)
     DauSach** dsList = new DauSach*[NUM_DAUSACH];
     int dsCount = 0;
 
     for (int i = 0; i < NUM_DAUSACH; i++) {
         DauSach* ds = new DauSach();
+        memset(ds, 0, sizeof(DauSach));
 
-        // ✅ ISBN: đảm bảo không tràn buffer (giả định ISBN[20] trong models.h)
-        snprintf(ds->ISBN, sizeof(ds->ISBN), "S%03d", i + 1);       
-
-        // ✅ Ten sach: snprintf LUÔN đảm bảo '\0' + không tràn
-        // Giả định tenSach[50]
-        snprintf(ds->tenSach, 50, "%s %s %s (Tap %d)",
+        snprintf(ds->ISBN, sizeof(ds->ISBN), "978%04d", i + 1);
+        snprintf(ds->tenSach, sizeof(ds->tenSach), "%s %s %s (T%d)",
                  pick(DANH_TU_SACH, N_DANH_TU),
                  pick(THE_LOAI, N_THE_LOAI),
                  pick(TINH_TU, N_TINH_TU),
                  i + 1);
-
-        // Giả định tacGia[30]
-        snprintf(ds->tacGia, 30, "%s %s",
+        snprintf(ds->tacGia, sizeof(ds->tacGia), "%s %s",
                  pick(TAC_GIA_HO, N_TG_HO),
                  pick(TEN_NAM, N_TEN_NAM));
-
-        // Giả định theLoai[30]
-        snprintf(ds->theLoai, 30, "%s", pick(THE_LOAI, N_THE_LOAI));
+        snprintf(ds->theLoai, sizeof(ds->theLoai), "%s", pick(THE_LOAI, N_THE_LOAI));
 
         ds->soTrang     = randRange(80, 800);
-        ds->namXB       = randRange(1990, 2024);
+        ds->namXB       = randRange(1995, 2026);
         ds->soLuongSach = 0;
         ds->soLuotMuon  = 0;
         ds->dms         = nullptr;
 
         if (!svc.insertDauSach(ds)) {
-            fprintf(stderr, "LOI: trung ISBN %s\n", ds->ISBN);
             delete ds;
             continue;
         }
-
         dsList[dsCount++] = ds;
 
-        // Tạo sách vật lý
         int soCuon = randRange(MIN_SACH, MAX_SACH);
-        char viTri[20];
+        char viTri[30];
         snprintf(viTri, sizeof(viTri), "Ke %c%d", (char)('A' + (i % 10)), randRange(1, 5));
         svc.addSachAuto(ds, soCuon, viTri);
 
-        if ((i + 1) % 20 == 0) printf("      ... %d/%d\n", i + 1, NUM_DAUSACH);
+        if ((i + 1) % 25 == 0) printf("      ... %d/%d dau sach\n", i + 1, NUM_DAUSACH);
     }
     printf("      Xong: %d dau sach\n\n", dsCount);
 
-    // ---------- 2. ĐỘC GIẢ ----------
+    // ---------- 2. ĐỘC GIẢ & LỊCH SỬ MƯỢN TRẢ ----------
     printf("[2/3] Tao %d doc gia...\n", NUM_DOCGIA);
 
     for (int i = 0; i < NUM_DOCGIA; i++) {
         TheDocGia dg;
-        // ✅ zero-init để tránh byte rác trong struct
         memset(&dg, 0, sizeof(dg));
 
         dg.maThe = svc.generateReaderKey();
 
-        bool isNam = randChance(0.5);
+        // Ánh xạ 1-1 từ chỉ số i -> comboIdx duy nhất trong [0 .. 104999]
+        long long comboIdx = (SEED + (long long)i * STEP) % TOTAL_COMBOS;
 
-        // Giả định các buffer: ho[30], ten[20], phai[10]
-        snprintf(dg.ho,   30, "%s", pick(HO, N_HO));
-        snprintf(dg.ten,  20, "%s",
-                 isNam ? pick(TEN_NAM, N_TEN_NAM) : pick(TEN_NU, N_TEN_NU));
-        snprintf(dg.phai, 10, "%s", isNam ? "Nam" : "Nu");
+        int idxHo  = (int)(comboIdx % N_HO);
+        comboIdx  /= N_HO;
+        int idxDem = (int)(comboIdx % TOTAL_DEM);
+        int idxTen = (int)(comboIdx / TOTAL_DEM);
 
-        dg.trangThai = randChance(0.03) ? KHOA : HOAT_DONG;
+        bool isNam = (idxTen < N_TEN_NAM);
+        const char* hoStr  = HO[idxHo];
+        const char* tenStr = isNam ? TEN_NAM[idxTen] : TEN_NU[idxTen - N_TEN_NAM];
+
+        // Giữ tổng số trạng thái đệm đúng 30 mà vẫn ưu tiên đúng giới tính
+        const char* demStr = nullptr;
+        if (isNam) {
+            demStr = (idxDem < N_DEM_NAM) ? DEM_NAM[idxDem] : DEM_NU[idxDem - N_DEM_NAM];
+        } else {
+            demStr = (idxDem < N_DEM_NU) ? DEM_NU[idxDem] : DEM_NAM[idxDem - N_DEM_NU];
+        }
+
+        snprintf(dg.ho,   sizeof(dg.ho),   "%s %s", hoStr, demStr);
+        snprintf(dg.ten,  sizeof(dg.ten),  "%s", tenStr);
+        snprintf(dg.phai, sizeof(dg.phai), "%s", isNam ? "Nam" : "Nu");
+
+        dg.trangThai = randChance(0.02) ? KHOA : HOAT_DONG;
         dg.dsMuonTra = nullptr;
 
-        // Mượn sách
-        if (dg.trangThai == HOAT_DONG && randChance(RATIO_CO_MUON)) {
+        if (dg.trangThai == HOAT_DONG && randChance(RATIO_CO_MUON) && dsCount > 0) {
             int nMuon = randRange(1, MAX_MUON_PER_DG);
             NodeMuonTra* tailMT = nullptr;
-            int borrowedThisRound = 0;
+            DauSach* pickedDS[MAX_MUON_PER_DG] = { nullptr };
+            int pickedCount = 0;
 
             for (int k = 0; k < nMuon; k++) {
-                if (dsCount == 0) break;
                 DauSach* ds = dsList[rand() % dsCount];
-                if (!ds || !ds->dms) continue;
+                if (!ds || !ds->dms || ds->soLuongSach <= 0) continue;
 
-                // Đếm sách
-                int total = 0;
-                for (NodeSach* p = ds->dms; p; p = p->next) total++;
-                if (total == 0) continue;
+                bool dupISBN = false;
+                for (int p = 0; p < pickedCount; p++) {
+                    if (pickedDS[p] == ds) { dupISBN = true; break; }
+                }
+                if (dupISBN) continue;
+                pickedDS[pickedCount++] = ds;
 
-                // Chọn 1 cuốn
-                int pickIdx = rand() % total;
+                int pickIdx = rand() % ds->soLuongSach;
                 NodeSach* ns = ds->dms;
                 for (int t = 0; t < pickIdx && ns; t++) ns = ns->next;
-                if (!ns) continue;
+                if (!ns || ns->data.trangThai != CHO_MUON_DUOC) continue;
 
-                // ✅ Cấp phát và zero-init NodeMuonTra
                 NodeMuonTra* mt = new NodeMuonTra();
-                memset(&mt->data, 0, sizeof(mt->data));
-                mt->next = nullptr;
-
-                snprintf(mt->data.maSach, 25, "%s", ns->data.maSach);
+                memset(mt, 0, sizeof(NodeMuonTra));
+                snprintf(mt->data.maSach, sizeof(mt->data.maSach), "%s", ns->data.maSach);
 
                 bool dangMuon = randChance(RATIO_DANG_MUON);
-
                 if (dangMuon) {
-                    if (ns->data.trangThai != CHO_MUON_DUOC) {
-                        delete mt;
-                        continue;
-                    }
-                    SimpleDate dm = genPastDate(0, 60);
-                    mt->data.ngayMuon.d = dm.d;
-                    mt->data.ngayMuon.m = dm.m;
-                    mt->data.ngayMuon.y = dm.y;
-                    mt->data.ngayTra.d = 0;
-                    mt->data.ngayTra.m = 0;
-                    mt->data.ngayTra.y = 0;
+                    int daysAgo = randRange(0, 20);
+                    mt->data.ngayMuon = genDateOffset(-daysAgo);
+                    mt->data.ngayTra = { 0, 0, 0 };
                     mt->data.trangThai = DANG_MUON;
 
                     ns->data.trangThai = DA_CHO_MUON;
                     ds->soLuotMuon++;
-                    borrowedThisRound++;
                 } else {
-                    // Lịch sử đã trả
-                    int muonDaysAgo = randRange(10, 400);
-                    int duration = randRange(1, 30);
-                    SimpleDate dm = genPastDate(muonDaysAgo, muonDaysAgo);
-                    SimpleDate dt = genDateAfterDaysAgo(muonDaysAgo, duration);
+                    int muonDaysAgo = randRange(15, 365);
+                    int duration = randRange(1, 14);
+                    mt->data.ngayMuon = genDateOffset(-muonDaysAgo);
+                    mt->data.ngayTra = genDateOffset(-muonDaysAgo + duration);
 
-                    mt->data.ngayMuon.d = dm.d;
-                    mt->data.ngayMuon.m = dm.m;
-                    mt->data.ngayMuon.y = dm.y;
-                    mt->data.ngayTra.d = dt.d;
-                    mt->data.ngayTra.m = dt.m;
-                    mt->data.ngayTra.y = dt.y;
-                    mt->data.trangThai = randChance(0.02) ? LAM_MAT : DA_TRA;
-
+                    if (randChance(0.01)) {
+                        mt->data.trangThai = LAM_MAT;
+                        ns->data.trangThai = DA_THANH_LY;
+                        dg.trangThai = KHOA;
+                    } else {
+                        mt->data.trangThai = DA_TRA;
+                    }
                     ds->soLuotMuon++;
                 }
 
@@ -254,25 +257,22 @@ int main() {
         }
 
         svc.addDocGia(dg);
-
-        if ((i + 1) % 20000 == 0) printf("      ... %d/%d\n", i + 1, NUM_DOCGIA);
+        if ((i + 1) % 25000 == 0) printf("      ... %d/%d doc gia\n", i + 1, NUM_DOCGIA);
     }
     printf("      Xong: %d doc gia\n\n", NUM_DOCGIA);
 
-    // ---------- 3. LƯU ----------
-    printf("[3/3] Dang ghi file...\n");
+    // ---------- 3. LƯU FILE ----------
+    printf("[3/3] Dang ghi dausach.txt & docgia.txt...\n");
     svc.saveToFile();
     printf("      Hoan tat!\n\n");
 
-    printf("=== KET QUA ===\n");
-    printf("Doc gia  : %d\n", NUM_DOCGIA);
-    printf("Dau sach : %d\n", dsCount);
     int totalSach = 0;
     for (int i = 0; i < dsCount; i++) totalSach += dsList[i]->soLuongSach;
-    printf("Tong sach: %d\n", totalSach);
+    printf("=== TONG KET ===\n");
+    printf("- Doc gia  : %d (Khong trung Ho & Ten)\n", NUM_DOCGIA);
+    printf("- Dau sach : %d\n", dsCount);
+    printf("- Tong sach: %d\n", totalSach);
 
-    // ✅ Giải phóng mảng động
     delete[] dsList;
-
     return 0;
 }

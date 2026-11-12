@@ -41,6 +41,10 @@
 #define C_INPUT_BG      15
 #define C_INPUT_FOCUS   207
 
+#define C_FIELD_NORM    240 // Nen trang (0xF), chu den (0x0)
+#define C_FIELD_SORT    241 // Nen trang (0xF), chu xanh duong dam (0x1)
+#define C_FIELD_SEL     160 // Nen xanh la sang (0xA), chu den (0x0)
+
 #define C_CATE_HEADER     (14 | (C_APP_BG & 0xF0))
 #define C_CATE_HEADER_SEL (0 | (C_ROW_SEL & 0xF0))
 
@@ -377,8 +381,9 @@ private:
     int selectedRow = 0;
     int scrollOffset = 0;
 
-    int selectedCol[5] = {0, 0, 0, 0, 0};
-    int sortState[5] = {0, 0, 0, 0, 0};
+    int selectedCol[5] = {0, 1, 0, 5, 0};
+    int sortCol[5]     = {0, 1, 0, 5, 0};
+    int sortState[5]   = {1, 1, 1, 1, 1};
     char searchKeyword[5][50] = {"", "", "", "", ""};
 
     int numFiltersForTab[5] = {7, 6, 6, 6, 5};
@@ -449,32 +454,153 @@ private:
         }
     }
 
+    int cmpDocGia(NodeDocGia* a, NodeDocGia* b, int col, int state) {
+        int cmp = 0;
+        if (col == 0) cmp = a->data.maThe - b->data.maThe;
+        else if (col == 1 || col == 3) {
+            // TEN + HO (1) va TEN (3): So sanh Ten truoc -> Ho dem sau
+            cmp = _stricmp(a->data.ten, b->data.ten);
+            if (cmp == 0) cmp = _stricmp(a->data.ho, b->data.ho);
+        } else if (col == 2) {
+            // HO VA TEN (2): So sanh Ho dem truoc -> Ten sau
+            cmp = _stricmp(a->data.ho, b->data.ho);
+            if (cmp == 0) cmp = _stricmp(a->data.ten, b->data.ten);
+        } else if (col == 4) cmp = _stricmp(a->data.phai, b->data.phai);
+        else if (col == 5) cmp = a->data.trangThai - b->data.trangThai;
+        else if (col == 6) {
+            int b1 = 0, b2 = 0; bool ov1, ov2;
+            LibraryService::checkBorrowStatus(a->data, b1, ov1);
+            LibraryService::checkBorrowStatus(b->data, b2, ov2);
+            cmp = b1 - b2;
+        }
+        return state == 1 ? cmp : -cmp;
+    }
+
+    void qsDocGia(NodeDocGia* arr[], int left, int right, int col, int state) {
+        int i = left, j = right;
+        NodeDocGia* pivot = arr[(left + right) / 2];
+        while (i <= j) {
+            while (cmpDocGia(arr[i], pivot, col, state) < 0) i++;
+            while (cmpDocGia(arr[j], pivot, col, state) > 0) j--;
+            if (i <= j) {
+                NodeDocGia* tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
+                i++; j--;
+            }
+        }
+        if (left < j) qsDocGia(arr, left, j, col, state);
+        if (i < right) qsDocGia(arr, i, right, col, state);
+    }
+
+    int cmpDauSach(DauSach* a, DauSach* b, int col, int state) {
+        int cmp = 0;
+        if (col == 0) cmp = _stricmp(a->ISBN, b->ISBN);
+        else if (col == 1) cmp = _stricmp(a->tenSach, b->tenSach);
+        else if (col == 2) cmp = _stricmp(a->tacGia, b->tacGia);
+        else if (col == 3) cmp = _stricmp(a->theLoai, b->theLoai);
+        else if (col == 4) cmp = a->namXB - b->namXB;
+        else if (col == 5) cmp = a->soLuongSach - b->soLuongSach;
+        return state == 1 ? cmp : -cmp;
+    }
+
+    void qsDauSach(DauSach* arr[], int left, int right, int col, int state) {
+        int i = left, j = right;
+        DauSach* pivot = arr[(left + right) / 2];
+        while (i <= j) {
+            while (cmpDauSach(arr[i], pivot, col, state) < 0) i++;
+            while (cmpDauSach(arr[j], pivot, col, state) > 0) j--;
+            if (i <= j) {
+                DauSach* tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
+                i++; j--;
+            }
+        }
+        if (left < j) qsDauSach(arr, left, j, col, state);
+        if (i < right) qsDauSach(arr, i, right, col, state);
+    }
+
+    int cmpActiveBorrow(ActiveBorrow& a, ActiveBorrow& b, int col, int state) {
+        int cmp = 0;
+        if (col == 0) cmp = a.maThe - b.maThe;
+        else if (col == 1) cmp = _stricmp(a.hoTen, b.hoTen);
+        else if (col == 2) cmp = _stricmp(a.maSach, b.maSach);
+        else if (col == 3) cmp = _stricmp(a.tenSach, b.tenSach);
+        else if (col == 4) {
+            long d1 = dateToDays(a.ngayMuon); long d2 = dateToDays(b.ngayMuon);
+            cmp = (d1 > d2) - (d1 < d2);
+        }
+        else if (col == 5) cmp = a.days - b.days;
+        return state == 1 ? cmp : -cmp;
+    }
+
+    void qsActiveBorrow(ActiveBorrow arr[], int left, int right, int col, int state) {
+        int i = left, j = right;
+        ActiveBorrow pivot = arr[(left + right) / 2];
+        while (i <= j) {
+            while (cmpActiveBorrow(arr[i], pivot, col, state) < 0) i++;
+            while (cmpActiveBorrow(arr[j], pivot, col, state) > 0) j--;
+            if (i <= j) {
+                ActiveBorrow tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
+                i++; j--;
+            }
+        }
+        if (left < j) qsActiveBorrow(arr, left, j, col, state);
+        if (i < right) qsActiveBorrow(arr, i, right, col, state);
+    }
+
+    int cmpOverdueRecord(OverdueRecord& a, OverdueRecord& b, int col, int state) {
+        int cmp = 0;
+        if (col == 0) cmp = a.maThe - b.maThe;
+        else if (col == 1) cmp = _stricmp(a.hoTen, b.hoTen);
+        else if (col == 2) cmp = _stricmp(a.maSach, b.maSach);
+        else if (col == 3) cmp = _stricmp(a.tenSach, b.tenSach);
+        else if (col == 4) {
+            long d1 = dateToDays(a.ngayMuon); long d2 = dateToDays(b.ngayMuon);
+            cmp = (d1 > d2) - (d1 < d2);
+        }
+        else if (col == 5) cmp = a.soNgayQuaHan - b.soNgayQuaHan;
+        return state == 1 ? cmp : -cmp;
+    }
+
+    void qsOverdueRecord(OverdueRecord arr[], int left, int right, int col, int state) {
+        int i = left, j = right;
+        OverdueRecord pivot = arr[(left + right) / 2];
+        while (i <= j) {
+            while (cmpOverdueRecord(arr[i], pivot, col, state) < 0) i++;
+            while (cmpOverdueRecord(arr[j], pivot, col, state) > 0) j--;
+            if (i <= j) {
+                OverdueRecord tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
+                i++; j--;
+            }
+        }
+        if (left < j) qsOverdueRecord(arr, left, j, col, state);
+        if (i < right) qsOverdueRecord(arr, i, right, col, state);
+    }
+
     void drawTopDashboard(int totalDG, int totalDS) {
         screen.clear();
-
         screen.writeStr(2, 0, "[ HE THONG QUAN LY THU VIEN ]", C_HEADER);
         Date d = getCurrentDate();
         char dateBuf[40];
         sprintf(dateBuf, "Ngay: %02d/%02d/%04d", d.d, d.m, d.y);
         screen.writeStr(SCREEN_W - 20, 0, dateBuf, C_HEADER);
-
         char metricBuf[100];
         sprintf(metricBuf, " Doc gia: %d | Dau sach: %d ", totalDG, totalDS);
         screen.writeStr(SCREEN_W - (int)strlen(metricBuf) - 1, 0, metricBuf, C_BORDER);
-
         screen.fillRect(0, SCREEN_H - 1, SCREEN_W, 1, C_APP_BG);
+
         if (currentTab == 0) {
-            screen.writeStr(1, SCREEN_H - 1, "ENTER:Chi tiet  F1:Them  F2:Sua  F3:Xoa  |  <- ->:Chon Tab  F:Tim  S:Sort  ESC:Thoat", C_KEYCAP);
+            screen.writeStr(1, SCREEN_H - 1, "ENTER:Chi tiet  F1:Them  F2:Sua  F3:Xoa  F4:Ten/Ma  |  TAB:Doi Tab  <- ->:Truong  F:Tim  S:Sort  ESC:Thoat", C_KEYCAP);
         } else if (currentTab == 1) {
             if (viewCategoryTree) {
-                screen.writeStr(1, SCREEN_H - 1, "ENTER:Chi tiet  F1:Them  F2:Sua  F3:Xoa  F4:Xem thuong  ESC:Thoat", C_KEYCAP);
+                screen.writeStr(1, SCREEN_H - 1, "ENTER:Chi tiet  F1:Them  F2:Sua  F3:Xoa  F4:Xem thuong  |  TAB:Doi Tab  ESC:Thoat", C_KEYCAP);
             } else {
-                screen.writeStr(1, SCREEN_H - 1, "ENTER:Chi tiet  F1:Them  F2:Sua  F3:Xoa  F4:Theo the loai  F5:Tim Ma", C_KEYCAP);
+                screen.writeStr(1, SCREEN_H - 1, "ENTER:Chi tiet  F1:Them  F2:Sua  F3:Xoa  F4:The loai  F5:Tim Ma  |  TAB:Tab  <- ->:Truong  F:Tim  S:Sort", C_KEYCAP);
             }
         } else if (currentTab == 2) {
-            screen.writeStr(1, SCREEN_H - 1, "F1:Muon  F2:Tra  F3:Mat Sach  |  <- ->:Chon Tab  F:Tim  S:Sort  ESC:Thoat", C_KEYCAP);
+            screen.writeStr(1, SCREEN_H - 1, "F1:Muon  F2:Tra  F3:Mat Sach  |  TAB:Doi Tab  <- ->:Truong  F:Tim  S:Sort  ESC:Thoat", C_KEYCAP);
+        } else if (currentTab == 3) {
+            screen.writeStr(1, SCREEN_H - 1, "TAB:Doi Tab  <- ->:Doi Truong  F:Tim Kiem  S:Sort Truong Chon  ESC:Thoat", C_KEYCAP);
         } else {
-            screen.writeStr(1, SCREEN_H - 1, "<- ->:Chon Tab  F:Tim  S:Sort  ESC:Thoat", C_KEYCAP);
+            screen.writeStr(1, SCREEN_H - 1, "TAB:Doi Tab  <- ->:Doi Truong Tim  F:Tim Kiem  ESC:Thoat", C_KEYCAP);
         }
     }
 
@@ -482,20 +608,16 @@ private:
         const char* tabs[5] = { " 1. DOC GIA ", " 2. DAU SACH ", " 3. MUON/TRA ", " 4. QUA HAN ", " 5. TOP 10 " };
         int xPos = 2;
         int tableY = 3;
-
         for (int j = 1; j < SCREEN_W - 1; j++) screen.putChar(j, tableY, B_H, C_BORDER);
-
         for (int i = 0; i < 5; i++) {
-            int len = strlen(tabs[i]);
+            int len = (int)strlen(tabs[i]);
             if (i == currentTab) {
                 screen.putChar(xPos, tableY - 2, B_TL, C_BORDER);
                 for (int j = 0; j < len; j++) screen.putChar(xPos + 1 + j, tableY - 2, B_H, C_BORDER);
                 screen.putChar(xPos + len + 1, tableY - 2, B_TR, C_BORDER);
-
                 screen.putChar(xPos, tableY - 1, B_V, C_BORDER);
                 screen.writeStr(xPos + 1, tableY - 1, tabs[i], C_TAB_ACTIVE);
                 screen.putChar(xPos + len + 1, tableY - 1, B_V, C_BORDER);
-
                 screen.putChar(xPos, tableY, B_B, C_BORDER);
                 screen.putChar(xPos + len + 1, tableY, B_B, C_BORDER);
                 for (int j = 0; j < len; j++) screen.putChar(xPos + 1 + j, tableY, ' ', C_APP_BG);
@@ -506,8 +628,9 @@ private:
         }
     }
 
-    void drawSearchBar(bool isTyping) {
-        const char* filters0[] = {"MA THE", "HO VA TEN", "HO VA TEN DEM", "TEN", "PHAI", "TRANG THAI", "DANG MUON"};
+    void drawFieldAndSearchBars(bool isTyping) {
+        // TEN + HO (1) dung truoc HO VA TEN (2)
+        const char* filters0[] = {"MA THE", "TEN + HO", "HO VA TEN", "TEN", "PHAI", "TRANG THAI", "DANG MUON"};
         const char* filters1[] = {"ISBN", "TEN SACH", "TAC GIA", "THE LOAI", "NAM XB", "SO SACH"};
         const char* filters2[] = {"MA THE", "HO TEN", "MA SACH", "TEN SACH", "NGAY MUON", "TINH TRANG"};
         const char* filters3[] = {"MA THE", "HO TEN", "MA SACH", "TEN SACH", "NGAY MUON", "QUA HAN"};
@@ -520,128 +643,127 @@ private:
         else if (currentTab == 3) currentFilters = filters3;
         else if (currentTab == 4) currentFilters = filters4;
 
-        int fIdx = selectedCol[currentTab];
-        const char* filterName = currentFilters[fIdx];
+        int numF   = numFiltersForTab[currentTab];
+        int fIdx   = selectedCol[currentTab];
+        int sIdx   = sortCol[currentTab];
+        char arrow = (sortState[currentTab] == 1) ? '^' : 'v';
 
-        const char* sState = (sortState[currentTab] == 1) ? "^" : ((sortState[currentTab] == 2) ? "v" : "-");
+        // --- DONG 4: THANH HIEN THI CAC TRUONG ---
+        screen.writeStr(3, 4, "Truong:", C_HEADER);
+        int curX = 11;
 
-        char prompt[150];
         if (currentTab == 1 && viewCategoryTree) {
-            sprintf(prompt, " [ ViewMode ]");
+            screen.writeStr(curX, 4, "[ CHE DO CAY THE LOAI (Nhan F4 de quay lai bang thuong) ]", C_CATE_HEADER);
         } else {
-            sprintf(prompt, " [ %s | Sort: %s ] [TAB]: Doi Truong [F]: Tim ", filterName, sState);
+            for (int i = 0; i < numF; i++) {
+                bool isSelected = (i == fIdx);
+                bool isSorted   = (currentTab != 4 && i == sIdx);
+                char chip[50];
+
+                if (isSorted) sprintf(chip, " %s %c ", currentFilters[i], arrow);
+                else sprintf(chip, " %s ", currentFilters[i]);
+
+                int chipLen = (int)strlen(chip);
+                WORD chipAttr = isSelected ? C_FIELD_SEL : (isSorted ? C_FIELD_SORT : C_FIELD_NORM);
+
+                if (curX + chipLen < SCREEN_W - 3) {
+                    screen.writeStr(curX, 4, chip, chipAttr);
+                    curX += chipLen + 1;
+                }
+            }
         }
 
-        screen.writeStr(2, 4, prompt, isTyping ? C_HEADER : C_TAB_INACTIVE);
+        // --- DONG 5: THANH TIM KIEM ---
+        if (currentTab == 1 && viewCategoryTree) {
+            screen.writeStr(3, 5, "Tim kiem: <Vo hieu hoa o che do cay the loai>", C_TAB_INACTIVE);
+        } else {
+            const char* prefix = "Tim theo ";
+            screen.writeStr(3, 5, prefix, isTyping ? C_HEADER : C_TAB_INACTIVE);
+            int curSearchX = 3 + (int)strlen(prefix);
 
-        if (!(currentTab == 1 && viewCategoryTree)) {
-            int inputX = 2 + strlen(prompt);
-            int inputW = 35;
+            char fieldBadge[60];
+            sprintf(fieldBadge, "[ %s ]", currentFilters[fIdx]);
+            screen.writeStr(curSearchX, 5, fieldBadge, C_BADGE_OK);
+            curSearchX += (int)strlen(fieldBadge);
+
+            screen.writeStr(curSearchX, 5, ": ", isTyping ? C_HEADER : C_TAB_INACTIVE);
+            curSearchX += 2;
+
+            int inputX = curSearchX;
+            int inputW = 36;
             WORD attr = isTyping ? C_INPUT_FOCUS : C_INPUT_BG;
+            screen.fillRect(inputX, 5, inputW, 1, attr);
 
-            screen.fillRect(inputX, 4, inputW, 1, attr);
             if (strlen(searchKeyword[currentTab]) == 0) {
-                screen.writeStr(inputX + 1, 4, isTyping ? "" : "<Nhap tu khoa...>", isTyping ? attr : 8 | (attr & 0xF0));
+                screen.writeStr(inputX + 1, 5, isTyping ? "" : "<Nhan F de nhap tu khoa...>", isTyping ? attr : (8 | (attr & 0xF0)));
             } else {
-                screen.writeStr(inputX + 1, 4, searchKeyword[currentTab], attr);
+                screen.writeStr(inputX + 1, 5, searchKeyword[currentTab], attr);
             }
 
             if (isTyping) {
-                screen.putChar(inputX + 1 + strlen(searchKeyword[currentTab]), 4, '_', attr);
-                screen.writeStr(inputX + inputW + 2, 4, " [ENTER]: Xong [ESC]: Huy ", C_BADGE_WARN);
+                screen.putChar(inputX + 1 + (int)strlen(searchKeyword[currentTab]), 5, '_', attr);
+                screen.writeStr(inputX + inputW + 2, 5, "[ENTER]: Xong  [ESC]: Huy", C_BADGE_WARN);
             }
         }
     }
 
-    void filterAndSortDocGia(NodeDocGia* rawArr[], int nRaw, NodeDocGia* arr[], int& nOut) {
+    void filterAndSortDocGia(NodeDocGia* rawArr[], int nRaw, NodeDocGia* arr[], int& nOut, bool alreadySortedByName) {
         nOut = 0;
+        int searchC = selectedCol[0];
+        int sortC   = sortCol[0];
+        bool hasKeyword = (strlen(searchKeyword[0]) > 0);
+
         for (int i = 0; i < nRaw; i++) {
+            if (!hasKeyword) {
+                arr[nOut++] = rawArr[i];
+                continue;
+            }
             char val[300] = "";
-            int c = selectedCol[0];
-
             int b = 0; bool ov = false;
-            LibraryService::checkBorrowStatus(rawArr[i]->data, b, ov);
+            if (searchC == 6) LibraryService::checkBorrowStatus(rawArr[i]->data, b, ov);
 
-            if (c == 0) sprintf(val, "%d", rawArr[i]->data.maThe);
-            else if (c == 1) sprintf(val, "%s %s", rawArr[i]->data.ho, rawArr[i]->data.ten);
-            else if (c == 2) strcpy(val, rawArr[i]->data.ho);
-            else if (c == 3) strcpy(val, rawArr[i]->data.ten);
-            else if (c == 4) strcpy(val, rawArr[i]->data.phai);
-            else if (c == 5) strcpy(val, rawArr[i]->data.trangThai == HOAT_DONG ? "Hoat dong" : "Bi khoa");
-            else if (c == 6) sprintf(val, "%d", b);
+            if (searchC == 0) sprintf(val, "%d", rawArr[i]->data.maThe);
+            else if (searchC == 1) sprintf(val, "%s %s", rawArr[i]->data.ten, rawArr[i]->data.ho); // TEN + HO
+            else if (searchC == 2) sprintf(val, "%s %s", rawArr[i]->data.ho, rawArr[i]->data.ten); // HO VA TEN
+            else if (searchC == 3) strcpy(val, rawArr[i]->data.ten);                               // TEN
+            else if (searchC == 4) strcpy(val, rawArr[i]->data.phai);
+            else if (searchC == 5) strcpy(val, rawArr[i]->data.trangThai == HOAT_DONG ? "Hoat dong" : "Bi khoa");
+            else if (searchC == 6) sprintf(val, "%d", b);
 
             if (matchKeyword(val, searchKeyword[0])) arr[nOut++] = rawArr[i];
         }
 
-        if (sortState[0] != 0) {
-            for (int i = 0; i < nOut - 1; i++) {
-                for (int j = i + 1; j < nOut; j++) {
-                    bool swap = false;
-                    int c = selectedCol[0];
-                    if (c == 0) {
-                        if (sortState[0] == 1 && arr[i]->data.maThe > arr[j]->data.maThe) swap = true;
-                        if (sortState[0] == 2 && arr[i]->data.maThe < arr[j]->data.maThe) swap = true;
-                    } else if (c == 1 || c == 3) {
-                        int cmp = _stricmp(arr[i]->data.ten, arr[j]->data.ten);
-                        if (cmp == 0) cmp = _stricmp(arr[i]->data.ho, arr[j]->data.ho);
-                        if (sortState[0] == 1 && cmp > 0) swap = true;
-                        if (sortState[0] == 2 && cmp < 0) swap = true;
-                    } else if (c == 2) {
-                        int cmp = _stricmp(arr[i]->data.ho, arr[j]->data.ho);
-                        if (cmp == 0) cmp = _stricmp(arr[i]->data.ten, arr[j]->data.ten);
-                        if (sortState[0] == 1 && cmp > 0) swap = true;
-                        if (sortState[0] == 2 && cmp < 0) swap = true;
-                    } else if (c == 4) {
-                        int cmp = _stricmp(arr[i]->data.phai, arr[j]->data.phai);
-                        if (sortState[0] == 1 && cmp > 0) swap = true;
-                        if (sortState[0] == 2 && cmp < 0) swap = true;
-                    } else if (c == 5) {
-                        if (sortState[0] == 1 && arr[i]->data.trangThai > arr[j]->data.trangThai) swap = true;
-                        if (sortState[0] == 2 && arr[i]->data.trangThai < arr[j]->data.trangThai) swap = true;
-                    } else if (c == 6) {
-                        int b1 = 0, b2 = 0; bool ov1, ov2;
-                        LibraryService::checkBorrowStatus(arr[i]->data, b1, ov1);
-                        LibraryService::checkBorrowStatus(arr[j]->data, b2, ov2);
-                        if (sortState[0] == 1 && b1 > b2) swap = true;
-                        if (sortState[0] == 2 && b1 < b2) swap = true;
-                    }
-                    if (swap) { NodeDocGia* tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp; }
-                }
-            }
+        if (sortC == 0 && sortState[0] == 1) return;
+        if (alreadySortedByName) return;
+
+        if (nOut > 1) {
+            qsDocGia(arr, 0, nOut - 1, sortC, sortState[0]);
         }
     }
 
     void renderTabDocGia(NodeDocGia* arr[], int nDG) {
-        int visibleRows = 20;
+        int visibleRows = 19;
         adjustViewport(nDG, visibleRows);
-
         const int colX[6] = { 2, 15, 48, 68, 80, 100 };
         const int colW[6] = { 11, 31, 18, 10, 18, 19 };
-
         char hBuf[6][50]; const char* headers[6];
         const char* rawHeaders[6] = { "MA THE", "HO VA TEN DEM", "TEN", "PHAI", "TRANG THAI", "DANG MUON" };
         buildHeaders(rawHeaders, 6, 0, hBuf, headers);
-
-        screen.drawTableGrid(1, 5, 119, 23, colX, 6, headers, nDG, selectedRow);
-
+        screen.drawTableGrid(1, 6, 119, 22, colX, 6, headers, nDG, selectedRow);
         for (int i = 0; i < visibleRows && (scrollOffset + i) < nDG; i++) {
             int idx = scrollOffset + i;
-            int rowY = 8 + i;
+            int rowY = 9 + i;
             bool isSel = (idx == selectedRow);
             WORD rowAttr = screen.prepareTableRow(1, rowY, 119, idx, colX, 6, isSel);
-
             char sMa[15]; sprintf(sMa, "%d", arr[idx]->data.maThe);
             screen.writeCell(colX[0] + 1, rowY, colW[0], sMa, rowAttr);
             screen.writeCell(colX[1] + 1, rowY, colW[1], arr[idx]->data.ho, rowAttr);
             screen.writeCell(colX[2] + 1, rowY, colW[2], arr[idx]->data.ten, rowAttr);
             screen.writeCell(colX[3] + 1, rowY, colW[3], arr[idx]->data.phai, rowAttr);
-
             bool active = (arr[idx]->data.trangThai == HOAT_DONG);
             int borrowing = 0; bool ov = false;
             LibraryService::checkBorrowStatus(arr[idx]->data, borrowing, ov);
-
             char sMuon[15]; sprintf(sMuon, "%d/3 cuon", borrowing);
-
             screen.writeCell(colX[4] + 1, rowY, colW[4], active ? "Hoat dong" : "Bi khoa", isSel ? C_ROW_SEL : (active ? C_BADGE_OK : C_BADGE_ERR));
             screen.writeCell(colX[5] + 1, rowY, colW[5], sMuon, isSel ? C_ROW_SEL : (ov ? C_BADGE_ERR : C_ROW_NORM));
         }
@@ -649,43 +771,22 @@ private:
 
     void filterAndSortDauSach(DauSach* rawArr[], int nRaw, DauSach* arr[], int& nOut) {
         nOut = 0;
+        int searchC = selectedCol[1];
+        int sortC   = sortCol[1];
         for (int i = 0; i < nRaw; i++) {
             char val[100] = "";
-            int c = selectedCol[1];
-            if (c == 0) strcpy(val, rawArr[i]->ISBN);
-            else if (c == 1) strcpy(val, rawArr[i]->tenSach);
-            else if (c == 2) strcpy(val, rawArr[i]->tacGia);
-            else if (c == 3) strcpy(val, rawArr[i]->theLoai);
-            else if (c == 4) sprintf(val, "%d", rawArr[i]->namXB);
-            else if (c == 5) sprintf(val, "%d", rawArr[i]->soLuongSach);
-
+            if (searchC == 0) strcpy(val, rawArr[i]->ISBN);
+            else if (searchC == 1) strcpy(val, rawArr[i]->tenSach);
+            else if (searchC == 2) strcpy(val, rawArr[i]->tacGia);
+            else if (searchC == 3) strcpy(val, rawArr[i]->theLoai);
+            else if (searchC == 4) sprintf(val, "%d", rawArr[i]->namXB);
+            else if (searchC == 5) sprintf(val, "%d", rawArr[i]->soLuongSach);
             if (matchKeyword(val, searchKeyword[1])) arr[nOut++] = rawArr[i];
         }
-        if (sortState[1] != 0) {
-            for (int i = 0; i < nOut - 1; i++) {
-                for (int j = i + 1; j < nOut; j++) {
-                    bool swap = false;
-                    int cmp = 0;
-                    int c = selectedCol[1];
-                    if (c == 0) cmp = _stricmp(arr[i]->ISBN, arr[j]->ISBN);
-                    else if (c == 1) cmp = _stricmp(arr[i]->tenSach, arr[j]->tenSach);
-                    else if (c == 2) cmp = _stricmp(arr[i]->tacGia, arr[j]->tacGia);
-                    else if (c == 3) cmp = _stricmp(arr[i]->theLoai, arr[j]->theLoai);
-                    else if (c == 4) {
-                        if (sortState[1] == 1 && arr[i]->namXB > arr[j]->namXB) swap = true;
-                        if (sortState[1] == 2 && arr[i]->namXB < arr[j]->namXB) swap = true;
-                    }
-                    else if (c == 5) {
-                        if (sortState[1] == 1 && arr[i]->soLuongSach > arr[j]->soLuongSach) swap = true;
-                        if (sortState[1] == 2 && arr[i]->soLuongSach < arr[j]->soLuongSach) swap = true;
-                    }
-                    if (c != 4 && c != 5) {
-                        if (sortState[1] == 1 && cmp > 0) swap = true;
-                        if (sortState[1] == 2 && cmp < 0) swap = true;
-                    }
-                    if (swap) { DauSach* tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp; }
-                }
-            }
+        if (sortC == 1 && sortState[1] == 1) return;
+
+        if (nOut > 1) {
+            qsDauSach(arr, 0, nOut - 1, sortC, sortState[1]);
         }
     }
 
@@ -693,13 +794,11 @@ private:
         DauSach* sortedArr[MAX_DAUSACH];
         int count = 0;
         service.getBooksSortedByCategory(sortedArr, count);
-
         nRows = 0;
         int i = 0;
         while (i < count) {
             int j = i;
             while (j < count && _stricmp(sortedArr[j]->theLoai, sortedArr[i]->theLoai) == 0) j++;
-
             DisplayRowDS catRow;
             catRow.isCategory = true;
             strcpy(catRow.categoryName, sortedArr[i]->theLoai);
@@ -707,7 +806,6 @@ private:
             catRow.ds = nullptr;
             catRow.isLastInCategory = false;
             rows[nRows++] = catRow;
-
             for (int k = i; k < j; k++) {
                 DisplayRowDS bookRow;
                 bookRow.isCategory = false;
@@ -722,53 +820,37 @@ private:
     }
 
     void renderTabDauSach(DauSach* arr[], int nDS, DisplayRowDS treeRows[], int nTreeRows) {
-        int visibleRows = 20;
-
+        int visibleRows = 19;
         if (viewCategoryTree) {
             adjustViewport(nTreeRows, visibleRows);
-
             const int colX[5] = { 2, 16, 68, 98, 109 };
             const int colW[5] = { 12, 50, 28, 9, 10 };
             const char* headers[5] = { "ISBN", "THE LOAI / TEN DAU SACH", "TAC GIA", "NAM XB", "SO SACH" };
-
-            screen.drawTableGrid(1, 5, 119, 23, colX, 5, headers, nTreeRows, selectedRow);
-
+            screen.drawTableGrid(1, 6, 119, 22, colX, 5, headers, nTreeRows, selectedRow);
             for (int i = 0; i < visibleRows && (scrollOffset + i) < nTreeRows; i++) {
                 int idx = scrollOffset + i;
-                int rowY = 8 + i;
+                int rowY = 9 + i;
                 bool isSel = (idx == selectedRow);
                 WORD rowAttr = screen.prepareTableRow(1, rowY, 119, idx, colX, 5, isSel);
-
                 DisplayRowDS& item = treeRows[idx];
-
                 if (item.isCategory) {
                     WORD cateAttr = isSel ? C_CATE_HEADER_SEL : C_CATE_HEADER;
-
                     char catTitle[100];
                     sprintf(catTitle, "[+] %s (%d)", item.categoryName, item.countInCate);
-
                     screen.writeCell(colX[0] + 1, rowY, colW[0], "------", isSel ? C_ROW_SEL : C_BORDER);
                     screen.writeCell(colX[1] + 1, rowY, colW[1], catTitle, cateAttr);
                     screen.writeCell(colX[2] + 1, rowY, colW[2], "---------------------------", rowAttr);
                     screen.writeCell(colX[3] + 1, rowY, colW[3], "--------", rowAttr);
                     screen.writeCell(colX[4] + 1, rowY, colW[4], "--------", rowAttr);
-
                     WORD sepAttr = isSel ? C_ROW_SEL : C_BORDER;
-                    for (int c = 0; c < 4; c++) {
-                        screen.putChar(colX[c + 1] - 1, rowY, B_V, sepAttr);
-                    }
+                    for (int c = 0; c < 4; c++) screen.putChar(colX[c + 1] - 1, rowY, B_V, sepAttr);
                 } else {
                     char branch[150];
-                    if (item.isLastInCategory) {
-                        sprintf(branch, "  %c%c %s", B_BL, B_H, item.ds->tenSach);
-                    } else {
-                        sprintf(branch, "  %c%c %s", B_L, B_H, item.ds->tenSach);
-                    }
-
+                    if (item.isLastInCategory) sprintf(branch, "  %c%c %s", B_BL, B_H, item.ds->tenSach);
+                    else sprintf(branch, "  %c%c %s", B_L, B_H, item.ds->tenSach);
                     char sNam[10], sQty[10];
                     sprintf(sNam, "%d", item.ds->namXB);
                     sprintf(sQty, "%d", item.ds->soLuongSach);
-
                     screen.writeCell(colX[0] + 1, rowY, colW[0], item.ds->ISBN, rowAttr);
                     screen.writeCell(colX[1] + 1, rowY, colW[1], branch, rowAttr);
                     screen.writeCell(colX[2] + 1, rowY, colW[2], item.ds->tacGia, rowAttr);
@@ -778,24 +860,18 @@ private:
             }
         } else {
             adjustViewport(nDS, visibleRows);
-
             const int colX[6] = { 2, 16, 52, 75, 96, 107 };
             const int colW[6] = { 12, 34, 21, 19, 9, 11 };
-
             char hBuf[6][50]; const char* headers[6];
             const char* rawHeaders[6] = { "ISBN", "TEN SACH", "TAC GIA", "THE LOAI", "NAM XB", "SO SACH" };
             buildHeaders(rawHeaders, 6, 1, hBuf, headers);
-
-            screen.drawTableGrid(1, 5, 119, 23, colX, 6, headers, nDS, selectedRow);
-
+            screen.drawTableGrid(1, 6, 119, 22, colX, 6, headers, nDS, selectedRow);
             for (int i = 0; i < visibleRows && (scrollOffset + i) < nDS; i++) {
-                int idx = scrollOffset + i; int rowY = 8 + i;
+                int idx = scrollOffset + i; int rowY = 9 + i;
                 bool isSel = (idx == selectedRow);
                 WORD rowAttr = screen.prepareTableRow(1, rowY, 119, idx, colX, 6, isSel);
-
                 char sNam[10]; sprintf(sNam, "%d", arr[idx]->namXB);
                 char sQty[10]; sprintf(sQty, "%d", arr[idx]->soLuongSach);
-
                 screen.writeCell(colX[0] + 1, rowY, colW[0], arr[idx]->ISBN, rowAttr);
                 screen.writeCell(colX[1] + 1, rowY, colW[1], arr[idx]->tenSach, rowAttr);
                 screen.writeCell(colX[2] + 1, rowY, colW[2], arr[idx]->tacGia, rowAttr);
@@ -808,72 +884,39 @@ private:
 
     void filterAndSortMuonTra(ActiveBorrow rawArr[], int nRaw, ActiveBorrow arr[], int& nOut) {
         nOut = 0;
+        int searchC = selectedCol[2];
+        int sortC   = sortCol[2];
         for (int i = 0; i < nRaw; i++) {
             char val[300] = "";
-            int c = selectedCol[2];
             char dStr[20]; sprintf(dStr, "%02d/%02d/%04d", rawArr[i].ngayMuon.d, rawArr[i].ngayMuon.m, rawArr[i].ngayMuon.y);
             const char* tt = rawArr[i].days > 7 ? "! QUA HAN" : "Dang muon";
-
-            if (c == 0) sprintf(val, "%d", rawArr[i].maThe);
-            else if (c == 1) strcpy(val, rawArr[i].hoTen);
-            else if (c == 2) strcpy(val, rawArr[i].maSach);
-            else if (c == 3) strcpy(val, rawArr[i].tenSach);
-            else if (c == 4) strcpy(val, dStr);
-            else if (c == 5) strcpy(val, tt);
-
+            if (searchC == 0) sprintf(val, "%d", rawArr[i].maThe);
+            else if (searchC == 1) strcpy(val, rawArr[i].hoTen);
+            else if (searchC == 2) strcpy(val, rawArr[i].maSach);
+            else if (searchC == 3) strcpy(val, rawArr[i].tenSach);
+            else if (searchC == 4) strcpy(val, dStr);
+            else if (searchC == 5) strcpy(val, tt);
             if (matchKeyword(val, searchKeyword[2])) arr[nOut++] = rawArr[i];
         }
-        if (sortState[2] != 0) {
-            for (int i = 0; i < nOut - 1; i++) {
-                for (int j = i + 1; j < nOut; j++) {
-                    bool swap = false;
-                    int c = selectedCol[2];
-                    if (c == 0) {
-                        if (sortState[2] == 1 && arr[i].maThe > arr[j].maThe) swap = true;
-                        if (sortState[2] == 2 && arr[i].maThe < arr[j].maThe) swap = true;
-                    } else if (c == 1) {
-                        int cmp = _stricmp(arr[i].hoTen, arr[j].hoTen);
-                        if (sortState[2] == 1 && cmp > 0) swap = true;
-                        if (sortState[2] == 2 && cmp < 0) swap = true;
-                    } else if (c == 2) {
-                        int cmp = _stricmp(arr[i].maSach, arr[j].maSach);
-                        if (sortState[2] == 1 && cmp > 0) swap = true;
-                        if (sortState[2] == 2 && cmp < 0) swap = true;
-                    } else if (c == 3) {
-                        int cmp = _stricmp(arr[i].tenSach, arr[j].tenSach);
-                        if (sortState[2] == 1 && cmp > 0) swap = true;
-                        if (sortState[2] == 2 && cmp < 0) swap = true;
-                    } else if (c == 4) {
-                        long d1 = dateToDays(arr[i].ngayMuon); long d2 = dateToDays(arr[j].ngayMuon);
-                        if (sortState[2] == 1 && d1 > d2) swap = true;
-                        if (sortState[2] == 2 && d1 < d2) swap = true;
-                    } else if (c == 5) {
-                        if (sortState[2] == 1 && arr[i].days > arr[j].days) swap = true;
-                        if (sortState[2] == 2 && arr[i].days < arr[j].days) swap = true;
-                    }
-                    if (swap) { ActiveBorrow tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp; }
-                }
-            }
+        if (sortC == 0 && sortState[2] == 1) return;
+
+        if (nOut > 1) {
+            qsActiveBorrow(arr, 0, nOut - 1, sortC, sortState[2]);
         }
     }
 
     void renderTabMuonTra(ActiveBorrow arr[], int nMT) {
-        int visibleRows = 20; adjustViewport(nMT, visibleRows);
-
+        int visibleRows = 19; adjustViewport(nMT, visibleRows);
         const int colX[6] = { 2, 13, 39, 55, 88, 102 };
         const int colW[6] = { 9, 24, 14, 31, 12, 16 };
-
         char hBuf[6][50]; const char* headers[6];
         const char* rawHeaders[6] = { "MA THE", "HO TEN", "MA SACH", "TEN SACH", "NGAY MUON", "TINH TRANG" };
         buildHeaders(rawHeaders, 6, 2, hBuf, headers);
-
-        screen.drawTableGrid(1, 5, 119, 23, colX, 6, headers, nMT, selectedRow);
-
+        screen.drawTableGrid(1, 6, 119, 22, colX, 6, headers, nMT, selectedRow);
         for (int i = 0; i < visibleRows && (scrollOffset + i) < nMT; i++) {
-            int idx = scrollOffset + i; int rowY = 8 + i;
+            int idx = scrollOffset + i; int rowY = 9 + i;
             bool isSel = (idx == selectedRow);
             WORD rowAttr = screen.prepareTableRow(1, rowY, 119, idx, colX, 6, isSel);
-
             char sMa[15], dateStr[20];
             sprintf(sMa, "%d", arr[idx].maThe); sprintf(dateStr, "%02d/%02d/%04d", arr[idx].ngayMuon.d, arr[idx].ngayMuon.m, arr[idx].ngayMuon.y);
             screen.writeCell(colX[0] + 1, rowY, colW[0], sMa, rowAttr);
@@ -881,7 +924,6 @@ private:
             screen.writeCell(colX[2] + 1, rowY, colW[2], arr[idx].maSach, rowAttr);
             screen.writeCell(colX[3] + 1, rowY, colW[3], arr[idx].tenSach, rowAttr);
             screen.writeCell(colX[4] + 1, rowY, colW[4], dateStr, rowAttr);
-
             bool over = (arr[idx].days > 7);
             screen.writeCell(colX[5] + 1, rowY, colW[5], over ? "! QUA HAN" : "Dang muon", isSel ? C_ROW_SEL : (over ? C_BADGE_ERR : C_BADGE_OK));
         }
@@ -889,67 +931,34 @@ private:
 
     void filterAndSortQuaHan(OverdueRecord rawArr[], int nRaw, OverdueRecord arr[], int& nOut) {
         nOut = 0;
+        int searchC = selectedCol[3];
+        int sortC   = sortCol[3];
         for (int i = 0; i < nRaw; i++) {
             char val[300] = "";
-            int c = selectedCol[3];
             char dStr[20]; sprintf(dStr, "%02d/%02d/%04d", rawArr[i].ngayMuon.d, rawArr[i].ngayMuon.m, rawArr[i].ngayMuon.y);
-
-            if (c == 0) sprintf(val, "%d", rawArr[i].maThe);
-            else if (c == 1) strcpy(val, rawArr[i].hoTen);
-            else if (c == 2) strcpy(val, rawArr[i].maSach);
-            else if (c == 3) strcpy(val, rawArr[i].tenSach);
-            else if (c == 4) strcpy(val, dStr);
-            else if (c == 5) sprintf(val, "%d", rawArr[i].soNgayQuaHan);
-
+            if (searchC == 0) sprintf(val, "%d", rawArr[i].maThe);
+            else if (searchC == 1) strcpy(val, rawArr[i].hoTen);
+            else if (searchC == 2) strcpy(val, rawArr[i].maSach);
+            else if (searchC == 3) strcpy(val, rawArr[i].tenSach);
+            else if (searchC == 4) strcpy(val, dStr);
+            else if (searchC == 5) sprintf(val, "%d", rawArr[i].soNgayQuaHan);
             if (matchKeyword(val, searchKeyword[3])) arr[nOut++] = rawArr[i];
         }
-        if (sortState[3] != 0) {
-            for (int i = 0; i < nOut - 1; i++) {
-                for (int j = i + 1; j < nOut; j++) {
-                    bool swap = false;
-                    int c = selectedCol[3];
-                    if (c == 0) {
-                        if (sortState[3] == 1 && arr[i].maThe > arr[j].maThe) swap = true;
-                        if (sortState[3] == 2 && arr[i].maThe < arr[j].maThe) swap = true;
-                    } else if (c == 1) {
-                        int cmp = _stricmp(arr[i].hoTen, arr[j].hoTen);
-                        if (sortState[3] == 1 && cmp > 0) swap = true;
-                        if (sortState[3] == 2 && cmp < 0) swap = true;
-                    } else if (c == 2) {
-                        int cmp = _stricmp(arr[i].maSach, arr[j].maSach);
-                        if (sortState[3] == 1 && cmp > 0) swap = true;
-                        if (sortState[3] == 2 && cmp < 0) swap = true;
-                    } else if (c == 3) {
-                        int cmp = _stricmp(arr[i].tenSach, arr[j].tenSach);
-                        if (sortState[3] == 1 && cmp > 0) swap = true;
-                        if (sortState[3] == 2 && cmp < 0) swap = true;
-                    } else if (c == 4) {
-                        long d1 = dateToDays(arr[i].ngayMuon); long d2 = dateToDays(arr[j].ngayMuon);
-                        if (sortState[3] == 1 && d1 > d2) swap = true;
-                        if (sortState[3] == 2 && d1 < d2) swap = true;
-                    } else if (c == 5) {
-                        if (sortState[3] == 1 && arr[i].soNgayQuaHan > arr[j].soNgayQuaHan) swap = true;
-                        if (sortState[3] == 2 && arr[i].soNgayQuaHan < arr[j].soNgayQuaHan) swap = true;
-                    }
-                    if (swap) { OverdueRecord tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp; }
-                }
-            }
+        if (nOut > 1) {
+            qsOverdueRecord(arr, 0, nOut - 1, sortC, sortState[3]);
         }
     }
 
     void renderTabQuaHan(OverdueRecord arr[], int nQH) {
-        int visibleRows = 20; adjustViewport(nQH, visibleRows);
+        int visibleRows = 19; adjustViewport(nQH, visibleRows);
         const int colX[6] = { 2, 13, 39, 55, 88, 102 };
         const int colW[6] = { 9, 24, 14, 31, 12, 16 };
-
         char hBuf[6][50]; const char* headers[6];
         const char* rawHeaders[6] = { "MA THE", "HO TEN", "MA SACH", "TEN SACH", "NGAY MUON", "QUA HAN" };
         buildHeaders(rawHeaders, 6, 3, hBuf, headers);
-
-        screen.drawTableGrid(1, 5, 119, 23, colX, 6, headers, nQH, selectedRow);
-
+        screen.drawTableGrid(1, 6, 119, 22, colX, 6, headers, nQH, selectedRow);
         for (int i = 0; i < visibleRows && (scrollOffset + i) < nQH; i++) {
-            int idx = scrollOffset + i; int rowY = 8 + i;
+            int idx = scrollOffset + i; int rowY = 9 + i;
             bool isSel = (idx == selectedRow); WORD rowAttr = screen.prepareTableRow(1, rowY, 119, idx, colX, 6, isSel);
             char sMa[15], dStr[20], sOver[20];
             sprintf(sMa, "%d", arr[idx].maThe); sprintf(dStr, "%02d/%02d/%04d", arr[idx].ngayMuon.d, arr[idx].ngayMuon.m, arr[idx].ngayMuon.y);
@@ -960,62 +969,30 @@ private:
         }
     }
 
-    void filterAndSortTop10(TopRecord rawArr[], int nRaw, TopRecord arr[], int& nOut) {
+    void filterTop10(TopRecord rawArr[], int nRaw, TopRecord arr[], int& nOut) {
         nOut = 0;
+        int searchC = selectedCol[4];
         for (int i = 0; i < nRaw; i++) {
             char val[300] = "";
-            int c = selectedCol[4];
-            if (c == 0) sprintf(val, "#%d", rawArr[i].rank);
-            else if (c == 1) strcpy(val, rawArr[i].ds->ISBN);
-            else if (c == 2) strcpy(val, rawArr[i].ds->tenSach);
-            else if (c == 3) strcpy(val, rawArr[i].ds->tacGia);
-            else if (c == 4) sprintf(val, "%d", rawArr[i].ds->soLuotMuon);
-
+            if (searchC == 0) sprintf(val, "#%d", rawArr[i].rank);
+            else if (searchC == 1) strcpy(val, rawArr[i].ds->ISBN);
+            else if (searchC == 2) strcpy(val, rawArr[i].ds->tenSach);
+            else if (searchC == 3) strcpy(val, rawArr[i].ds->tacGia);
+            else if (searchC == 4) sprintf(val, "%d", rawArr[i].ds->soLuotMuon);
             if (matchKeyword(val, searchKeyword[4])) arr[nOut++] = rawArr[i];
-        }
-        if (sortState[4] != 0) {
-            for (int i = 0; i < nOut - 1; i++) {
-                for (int j = i + 1; j < nOut; j++) {
-                    bool swap = false;
-                    int c = selectedCol[4];
-                    if (c == 0) {
-                        if (sortState[4] == 1 && arr[i].rank > arr[j].rank) swap = true;
-                        if (sortState[4] == 2 && arr[i].rank < arr[j].rank) swap = true;
-                    } else if (c == 1) {
-                        int cmp = _stricmp(arr[i].ds->ISBN, arr[j].ds->ISBN);
-                        if (sortState[4] == 1 && cmp > 0) swap = true;
-                        if (sortState[4] == 2 && cmp < 0) swap = true;
-                    } else if (c == 2) {
-                        int cmp = _stricmp(arr[i].ds->tenSach, arr[j].ds->tenSach);
-                        if (sortState[4] == 1 && cmp > 0) swap = true;
-                        if (sortState[4] == 2 && cmp < 0) swap = true;
-                    } else if (c == 3) {
-                        int cmp = _stricmp(arr[i].ds->tacGia, arr[j].ds->tacGia);
-                        if (sortState[4] == 1 && cmp > 0) swap = true;
-                        if (sortState[4] == 2 && cmp < 0) swap = true;
-                    } else if (c == 4) {
-                        if (sortState[4] == 1 && arr[i].ds->soLuotMuon > arr[j].ds->soLuotMuon) swap = true;
-                        if (sortState[4] == 2 && arr[i].ds->soLuotMuon < arr[j].ds->soLuotMuon) swap = true;
-                    }
-                    if (swap) { TopRecord tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp; }
-                }
-            }
         }
     }
 
     void renderTabTop10(TopRecord arr[], int nT10) {
-        int visibleRows = 20; adjustViewport(nT10, visibleRows);
+        int visibleRows = 19; adjustViewport(nT10, visibleRows);
         const int colX[5] = { 2, 11, 27, 67, 96 };
         const int colW[5] = { 7, 14, 38, 27, 22 };
-
         char hBuf[5][50]; const char* headers[5];
         const char* rawHeaders[5] = { "HANG", "ISBN", "TEN DAU SACH", "TAC GIA", "LUOT MUON" };
         buildHeaders(rawHeaders, 5, 4, hBuf, headers);
-
-        screen.drawTableGrid(1, 5, 119, 23, colX, 5, headers, nT10, selectedRow);
-
+        screen.drawTableGrid(1, 6, 119, 22, colX, 5, headers, nT10, selectedRow);
         for (int i = 0; i < visibleRows && (scrollOffset + i) < nT10; i++) {
-            int idx = scrollOffset + i; int rowY = 8 + i;
+            int idx = scrollOffset + i; int rowY = 9 + i;
             bool isSel = (idx == selectedRow); WORD rowAttr = screen.prepareTableRow(1, rowY, 119, idx, colX, 5, isSel);
             char sRank[10], sBorrows[25]; sprintf(sRank, "#%d", arr[idx].rank); sprintf(sBorrows, "%d luot", arr[idx].ds->soLuotMuon);
             screen.writeCell(colX[0] + 1, rowY, colW[0], sRank, isSel ? C_ROW_SEL : C_HEADER);
@@ -1031,7 +1008,6 @@ private:
         char values[4][50] = { "", "", "Nam", "Hoat dong" };
         const int maxLens[4] = { 35, 18, 5, 20 };
         const char* toggleOpts[4] = { "", "", "Nam,Nu", "Hoat dong,Bi khoa" };
-
         int newKey = editNode ? editNode->data.maThe : service.generateReaderKey();
         if (editNode) {
             strcpy(values[0], editNode->data.ho);
@@ -1040,7 +1016,6 @@ private:
             strcpy(values[3], editNode->data.trangThai == HOAT_DONG ? "Hoat dong" : "Bi khoa");
         }
         char info[60]; sprintf(info, "Ma The Doc Gia (Cap tu dong): #%d", newKey);
-
         if (screen.showFormDialog(editNode ? "HIEU CHINH DOC GIA" : "THEM DOC GIA", labels, values, maxLens, 4, info, toggleOpts)) {
             if (editNode) {
                 strcpy(editNode->data.ho, values[0]);
@@ -1064,7 +1039,6 @@ private:
         const char* labels[5] = { "Ma ISBN (978...):", "Ten sach        :", "Tac gia         :", "The loai        :", "So trang        :" };
         char values[5][50] = { "", "", "", "", "" };
         const int maxLens[5] = { 12, 40, 30, 25, 6 };
-
         if (screen.showFormDialog("THEM DAU SACH", labels, values, maxLens, 5)) {
             DauSach* ds = new DauSach;
             strcpy(ds->ISBN, values[0]);
@@ -1076,11 +1050,8 @@ private:
             ds->dms = nullptr;
             ds->soLuongSach = 0;
             ds->soLuotMuon = 0;
-
             if (!service.insertDauSach(ds)) {
-                delete ds;
-                screen.showMessage("Loi: Trung ma ISBN!");
-                return;
+                delete ds; screen.showMessage("Loi: Trung ma ISBN!");
             }
         }
     }
@@ -1089,31 +1060,23 @@ private:
         if (!ds) return;
         const char* labels[5] = { "Ten sach        :", "Tac gia         :", "The loai        :", "Nam XB          :", "So trang        :" };
         char values[5][50];
-
         strcpy(values[0], ds->tenSach);
         strcpy(values[1], ds->tacGia);
         strcpy(values[2], ds->theLoai);
         sprintf(values[3], "%d", ds->namXB);
         sprintf(values[4], "%d", ds->soTrang);
-
         const int maxLens[5] = { 40, 30, 25, 4, 6 };
-
-        char info[60];
-        sprintf(info, "Ma ISBN: %s (Khong duoc phep sua)", ds->ISBN);
-
+        char info[60]; sprintf(info, "Ma ISBN: %s (Khong duoc phep sua)", ds->ISBN);
         if (screen.showFormDialog("HIEU CHINH DAU SACH", labels, values, maxLens, 5, info)) {
             if (service.updateDauSach(ds->ISBN, values[0], values[1], values[2], atoi(values[3]), atoi(values[4]))) {
                 screen.showMessage("Da cap nhat thong tin Dau sach!");
-            } else {
-                screen.showMessage("Loi khi cap nhat!", true);
-            }
+            } else screen.showMessage("Loi khi cap nhat!", true);
         }
     }
 
     void dialogBorrowOrReturn(int mode) {
         const char* titles[3] = { "MUON SACH", "TRA SACH", "BAO MAT SACH" };
         const char* labels[2] = { "Ma The :", "Ma Sach:" }; char values[2][50] = { "", "" }; const int maxLens[2] = { 10, 22 };
-
         if (screen.showFormDialog(titles[mode], labels, values, maxLens, 2)) {
             const char* res = (mode == 0) ? service.borrowBook(atoi(values[0]), values[1]) : service.returnBook(atoi(values[0]), values[1], mode);
             if (strcmp(res, "OK") == 0) screen.showMessage("Thanh cong!"); else screen.showMessage(res, true);
@@ -1122,13 +1085,11 @@ private:
 
     void renderDialogChiTietSach(DauSach* ds) {
         if (!ds) return;
-        int selRow = 0;
-        int scrOffset = 0;
+        int selRow = 0; int scrOffset = 0;
         while (true) {
             NodeSach* arr[500]; int count = 0;
             NodeSach* p = ds->dms;
             while (p && count < 500) { arr[count++] = p; p = p->next; }
-
             int visibleRows = 12;
             if (count <= 0) { selRow = 0; scrOffset = 0; }
             else {
@@ -1137,57 +1098,35 @@ private:
                 if (selRow < scrOffset) scrOffset = selRow;
                 if (selRow >= scrOffset + visibleRows) scrOffset = selRow - visibleRows + 1;
             }
-
             int boxW = 82, boxH = 22;
             int startX = (SCREEN_W - boxW) / 2;
             int startY = (SCREEN_H - boxH) / 2;
-
             screen.drawBox(startX, startY, boxW, boxH, C_DLG_BG, C_DLG_BG, "CHI TIET SACH");
-
             char titleInfo[150];
             sprintf(titleInfo, "Dau sach: %s | So trang: %d | Tong so cuon: %d", ds->tenSach, ds->soTrang, ds->soLuongSach);
             screen.writeStr(startX + 3, startY + 2, titleInfo, C_DLG_BG);
-
             const int colX[3] = { startX + 3, startX + 22, startX + 44 };
             const int colW[3] = { 18, 21, 34 };
             const char* headers[3] = { "MA SACH", "TRANG THAI", "VI TRI KE SACH" };
-
-            int tableX = startX + 2;
-            int tableY = startY + 4;
-            int tableW = boxW - 4;
-            int tableH = 14;
-
+            int tableX = startX + 2; int tableY = startY + 4; int tableW = boxW - 4; int tableH = 14;
             screen.drawTableGrid(tableX, tableY, tableW, tableH, colX, 3, headers, count, selRow);
-
             for (int i = 0; i < visibleRows && (scrOffset + i) < count; i++) {
-                int idx = scrOffset + i;
-                int rowY = tableY + 3 + i;
+                int idx = scrOffset + i; int rowY = tableY + 3 + i;
                 bool isSel = (idx == selRow);
-
                 WORD rowAttr = isSel ? C_ROW_SEL : C_ROW_NORM;
                 WORD sepAttr = isSel ? C_ROW_SEL : C_BORDER;
-
                 screen.fillRect(tableX + 1, rowY, tableW - 1, 1, rowAttr);
-
-                screen.putChar(colX[1] - 1, rowY, B_V, sepAttr);
-                screen.putChar(colX[2] - 1, rowY, B_V, sepAttr);
-
+                screen.putChar(colX[1] - 1, rowY, B_V, sepAttr); screen.putChar(colX[2] - 1, rowY, B_V, sepAttr);
                 screen.writeCell(colX[0], rowY, colW[0], arr[idx]->data.maSach, rowAttr);
-
                 const char* ttStr = "Cho muon duoc";
                 if (arr[idx]->data.trangThai == DA_CHO_MUON) ttStr = "Da muon";
                 else if (arr[idx]->data.trangThai == DA_THANH_LY) ttStr = "Da thanh ly";
-
                 screen.writeCell(colX[1], rowY, colW[1], ttStr, rowAttr);
                 screen.writeCell(colX[2], rowY, colW[2], arr[idx]->data.viTri, rowAttr);
-
-                screen.putChar(tableX, rowY, B_V, C_BORDER);
-                screen.putChar(tableX + tableW, rowY, B_V, C_BORDER);
+                screen.putChar(tableX, rowY, B_V, C_BORDER); screen.putChar(tableX + tableW, rowY, B_V, C_BORDER);
             }
-
             screen.writeStr(startX + 2, startY + boxH - 2, "F1:Them  F2:Sua VTri  F3:Xoa  F4:Thanh ly  ESC:Dong", C_DLG_BG);
             screen.render();
-
             int ch = _getch();
             if (ch == KEY_ESC) break;
             if (ch == 0 || ch == 224) {
@@ -1204,47 +1143,23 @@ private:
                     }
                 }
                 else if (ext == KEY_F2 && count > 0) {
-                    if (arr[selRow]->data.trangThai == DA_CHO_MUON) {
-                        screen.showMessage("Khong the sua vi sach dang duoc muon!");
-                        continue;
-                    }
-                    if (arr[selRow]->data.trangThai == DA_THANH_LY) {
-                        screen.showMessage("Sach da thanh ly, khong the doi vi tri!");
-                        continue;
-                    }
-                    const char* lb[1] = { "Vi tri ke:" };
-                    char val[1][50];
-                    strcpy(val[0], arr[selRow]->data.viTri);
-                    const int ml[1] = { 25 };
-
-                    if (screen.showFormDialog("HIEU CHINH VI TRI SACH", lb, val, ml, 1)) {
-                        strcpy(arr[selRow]->data.viTri, val[0]);
-                    }
+                    if (arr[selRow]->data.trangThai == DA_CHO_MUON) { screen.showMessage("Khong the sua vi sach dang duoc muon!"); continue; }
+                    if (arr[selRow]->data.trangThai == DA_THANH_LY) { screen.showMessage("Sach da thanh ly, khong the doi vi tri!"); continue; }
+                    const char* lb[1] = { "Vi tri ke:" }; char val[1][50]; strcpy(val[0], arr[selRow]->data.viTri); const int ml[1] = { 25 };
+                    if (screen.showFormDialog("HIEU CHINH VI TRI SACH", lb, val, ml, 1)) strcpy(arr[selRow]->data.viTri, val[0]);
                 }
                 else if (ext == KEY_F3 && count > 0) {
-                    if (arr[selRow]->data.trangThai == DA_CHO_MUON) {
-                        screen.showMessage("Khong the xoa vi sach dang duoc muon!");
-                        continue;
-                    }
+                    if (arr[selRow]->data.trangThai == DA_CHO_MUON) { screen.showMessage("Khong the xoa vi sach dang duoc muon!"); continue; }
                     if (screen.showConfirm("Xac nhan xoa cuon sach nay?")) {
                         if (service.removeSachVatLy(ds, arr[selRow]->data.maSach)) {
                             if (selRow >= count - 1 && selRow > 0) selRow--;
-                        } else {
-                            screen.showMessage("Loi khi xoa sach!");
-                        }
+                        } else screen.showMessage("Loi khi xoa sach!");
                     }
                 } else if (ext == KEY_F4 && count > 0) {
-                    if (arr[selRow]->data.trangThai == DA_CHO_MUON) {
-                        screen.showMessage("Khong the thanh ly vi sach dang duoc muon!");
-                        continue;
-                    }
-                    if (arr[selRow]->data.trangThai == DA_THANH_LY) {
-                        screen.showMessage("Sach nay da duoc thanh ly roi!");
-                        continue;
-                    }
+                    if (arr[selRow]->data.trangThai == DA_CHO_MUON) { screen.showMessage("Khong the thanh ly vi sach dang duoc muon!"); continue; }
+                    if (arr[selRow]->data.trangThai == DA_THANH_LY) { screen.showMessage("Sach nay da duoc thanh ly roi!"); continue; }
                     if (screen.showConfirm("Xac nhan THANH LY cuon sach nay?")) {
-                        arr[selRow]->data.trangThai = DA_THANH_LY;
-                        strcpy(arr[selRow]->data.viTri, "");
+                        arr[selRow]->data.trangThai = DA_THANH_LY; strcpy(arr[selRow]->data.viTri, "");
                     }
                 }
             }
@@ -1254,13 +1169,11 @@ private:
 
     void renderDialogChiTietDocGia(NodeDocGia* dg) {
         if (!dg) return;
-        int selRow = 0;
-        int scrOffset = 0;
+        int selRow = 0; int scrOffset = 0;
         while (true) {
             NodeMuonTra* arr[500]; int count = 0;
             NodeMuonTra* p = dg->data.dsMuonTra;
             while (p && count < 500) { arr[count++] = p; p = p->next; }
-
             int visibleRows = 12;
             if (count <= 0) { selRow = 0; scrOffset = 0; }
             else {
@@ -1269,78 +1182,49 @@ private:
                 if (selRow < scrOffset) scrOffset = selRow;
                 if (selRow >= scrOffset + visibleRows) scrOffset = selRow - visibleRows + 1;
             }
-
             int boxW = 106, boxH = 22;
             int startX = (SCREEN_W - boxW) / 2;
             int startY = (SCREEN_H - boxH) / 2;
-
             screen.drawBox(startX, startY, boxW, boxH, C_DLG_BG, C_DLG_BG, "CHI TIET DOC GIA - LICH SU MUON TRA");
-
             char titleInfo[100];
-            sprintf(titleInfo, "Doc gia: %d - %s %s | Trang thai: %s",
-                    dg->data.maThe, dg->data.ho, dg->data.ten,
+            sprintf(titleInfo, "Doc gia: %d - %s %s | Trang thai: %s", dg->data.maThe, dg->data.ho, dg->data.ten,
                     dg->data.trangThai == HOAT_DONG ? "Hoat dong" : "Bi khoa");
             screen.writeStr(startX + 3, startY + 2, titleInfo, C_DLG_BG);
-
             const int colX[5] = { startX + 3, startX + 17, startX + 61, startX + 75, startX + 89 };
             const int colW[5] = { 13, 43, 13, 13, 13 };
             const char* headers[5] = { "MA SACH", "TEN SACH", "NGAY MUON", "NGAY TRA", "TRANG THAI" };
-
-            int tableX = startX + 2;
-            int tableY = startY + 4;
-            int tableW = boxW - 4;
-            int tableH = 14;
-
+            int tableX = startX + 2; int tableY = startY + 4; int tableW = boxW - 4; int tableH = 14;
             screen.drawTableGrid(tableX, tableY, tableW, tableH, colX, 5, headers, count, selRow);
-
             Date today = getCurrentDate();
             for (int i = 0; i < visibleRows && (scrOffset + i) < count; i++) {
-                int idx = scrOffset + i;
-                int rowY = tableY + 3 + i;
+                int idx = scrOffset + i; int rowY = tableY + 3 + i;
                 bool isSel = (idx == selRow);
-
                 WORD rowAttr = isSel ? C_ROW_SEL : C_ROW_NORM;
                 WORD sepAttr = isSel ? C_ROW_SEL : C_BORDER;
-
                 screen.fillRect(tableX + 1, rowY, tableW - 1, 1, rowAttr);
                 for (int c = 1; c < 5; c++) screen.putChar(colX[c] - 1, rowY, B_V, sepAttr);
-
                 screen.writeCell(colX[0], rowY, colW[0], arr[idx]->data.maSach, rowAttr);
-
                 NodeSach* ns = nullptr;
                 DauSach* ds = service.findDauSachByMaSach(arr[idx]->data.maSach, ns);
                 screen.writeCell(colX[1], rowY, colW[1], ds ? ds->tenSach : "N/A", rowAttr);
-
                 char nm[20], nt[20];
                 sprintf(nm, "%02d/%02d/%04d", arr[idx]->data.ngayMuon.d, arr[idx]->data.ngayMuon.m, arr[idx]->data.ngayMuon.y);
                 if (arr[idx]->data.trangThai == DANG_MUON) strcpy(nt, "--/--/----");
                 else sprintf(nt, "%02d/%02d/%04d", arr[idx]->data.ngayTra.d, arr[idx]->data.ngayTra.m, arr[idx]->data.ngayTra.y);
-
                 screen.writeCell(colX[2], rowY, colW[2], nm, rowAttr);
                 screen.writeCell(colX[3], rowY, colW[3], nt, rowAttr);
-
                 const char* ttStr = "Dang muon";
                 WORD statusAttr = rowAttr;
-                if (arr[idx]->data.trangThai == DA_TRA) {
-                    ttStr = "Da tra";
-                } else if (arr[idx]->data.trangThai == LAM_MAT) {
-                    ttStr = "Mat sach";
-                    statusAttr = isSel ? C_ROW_SEL : C_BADGE_ERR;
-                } else if (arr[idx]->data.trangThai == DANG_MUON) {
-                    if (daysBetween(arr[idx]->data.ngayMuon, today) > 7) {
-                        ttStr = "! Qua han";
-                        statusAttr = isSel ? C_ROW_SEL : C_BADGE_ERR;
-                    }
+                if (arr[idx]->data.trangThai == DA_TRA) ttStr = "Da tra";
+                else if (arr[idx]->data.trangThai == LAM_MAT) { ttStr = "Mat sach"; statusAttr = isSel ? C_ROW_SEL : C_BADGE_ERR; }
+                else if (arr[idx]->data.trangThai == DANG_MUON) {
+                    if (daysBetween(arr[idx]->data.ngayMuon, today) > 7) { ttStr = "! Qua han"; statusAttr = isSel ? C_ROW_SEL : C_BADGE_ERR; }
                 }
                 screen.writeCell(colX[4], rowY, colW[4], ttStr, statusAttr);
-
-                screen.putChar(tableX, rowY, B_V, C_BORDER);
-                screen.putChar(tableX + tableW, rowY, B_V, C_BORDER);
+                screen.putChar(tableX, rowY, B_V, C_BORDER); screen.putChar(tableX + tableW, rowY, B_V, C_BORDER);
             }
-
             screen.writeStr(startX + 3, startY + boxH - 2, "[Up/Down]: Cuon danh sach  |  [ESC]: Dong", C_DLG_BG);
             screen.render();
-
             int ch = _getch();
             if (ch == KEY_ESC) break;
             if (ch == 0 || ch == 224) {
@@ -1356,45 +1240,32 @@ private:
         const char* labels[1] = { "Nhap Ma Sach (VD: 97812_1):" };
         char values[1][50] = { "" };
         const int maxLens[1] = { 20 };
-
         if (screen.showFormDialog("TRA CUU SACH THEO MA", labels, values, maxLens, 1)) {
             NodeSach* bookNode = nullptr;
             DauSach* ds = service.findDauSachByMaSach(values[0], bookNode);
-
             if (ds && bookNode) {
                 int boxW = 60, boxH = 12;
                 int startX = (SCREEN_W - boxW) / 2;
                 int startY = (SCREEN_H - boxH) / 2;
-
                 screen.drawBox(startX, startY, boxW, boxH, C_DLG_BG, C_DLG_BG, "KET QUA TRA CUU");
-
                 char buf1[100], buf2[100], buf3[100], buf4[100];
                 sprintf(buf1, "- Ma Sach    : %s", bookNode->data.maSach);
                 sprintf(buf2, "- Dau Sach   : %s", ds->tenSach);
                 sprintf(buf3, "- Vi tri ke  : %s", bookNode->data.viTri);
-
                 const char* status = "Cho muon duoc";
                 if (bookNode->data.trangThai == DA_CHO_MUON) status = "Dang duoc muon";
                 else if (bookNode->data.trangThai == DA_THANH_LY) status = "Da thanh ly";
                 sprintf(buf4, "- Trang thai : %s", status);
-
                 screen.writeStr(startX + 3, startY + 3, buf1, C_DLG_BG);
                 screen.writeStr(startX + 3, startY + 5, buf2, C_DLG_BG);
                 screen.writeStr(startX + 3, startY + 7, buf3, C_DLG_BG);
                 WORD statusColor = (bookNode->data.trangThai == CHO_MUON_DUOC) ? C_BADGE_OK : C_BADGE_ERR;
-
                 screen.writeStr(startX + 3, startY + 9, buf4, statusColor | (C_DLG_BG & 0xF0));
-
                 screen.writeStr(startX + 15, startY + boxH - 2, " [ ENTER / ESC de dong ] ", C_DLG_BG);
                 screen.render();
-
-                int ch;
-                while ((ch = _getch()) != KEY_ESC && ch != KEY_ENTER);
-
+                int ch; while ((ch = _getch()) != KEY_ESC && ch != KEY_ENTER);
                 screen.clear();
-            } else {
-                screen.showMessage("Khong tim thay Ma Sach nay trong he thong!", true);
-            }
+            } else screen.showMessage("Khong tim thay Ma Sach nay trong he thong!", true);
         }
     }
 
@@ -1409,73 +1280,69 @@ public:
     void run() {
         bool isSearching = false;
         char backupKeyword[50] = "";
+        bool needUpdateData = true; 
+        
+        int nDG = 0, nDS = 0, nTreeRows = 0, nMT = 0, nQH = 0, nT10 = 0;
+        int nDGRaw = 0, nDSRaw = 0;
 
         while (true) {
-            int nDGRaw = 0;
-            service.getReadersList(bufDgArrRaw, nDGRaw, false);
+            if (needUpdateData) {
+                // TEN + HO (1) va TEN (3) deu xep theo Ten truoc -> Ho dem sau
+                bool sortByNameInService = (currentTab == 0 && (sortCol[0] == 1 || sortCol[0] == 3) && sortState[0] == 1);
+                service.getReadersList(bufDgArrRaw, nDGRaw, sortByNameInService);
+                service.getBooksList(bufDsViewRaw, nDSRaw, false);
 
-            int nDSRaw = 0;
-            service.getBooksList(bufDsViewRaw, nDSRaw, false);
+                if (currentTab == 0) filterAndSortDocGia(bufDgArrRaw, nDGRaw, bufDgArr, nDG, sortByNameInService);
 
-            int nDG = 0;
-            if (currentTab == 0) filterAndSortDocGia(bufDgArrRaw, nDGRaw, bufDgArr, nDG);
-
-            int nDS = 0;
-            int nTreeRows = 0;
-
-            if (currentTab == 1) {
-                if (viewCategoryTree) {
-                    buildCategoryTreeRows(bufTreeRows, nTreeRows);
-                } else {
-                    filterAndSortDauSach(bufDsViewRaw, nDSRaw, bufDsView, nDS);
+                if (currentTab == 1) {
+                    if (viewCategoryTree) buildCategoryTreeRows(bufTreeRows, nTreeRows);
+                    else filterAndSortDauSach(bufDsViewRaw, nDSRaw, bufDsView, nDS);
                 }
-            }
 
-            int nMT = 0;
-            if (currentTab == 2) {
-                int total = 0;
-                for (int i = 0; i < nDGRaw && total < MAX_MT_BUF; i++) {
-                    NodeMuonTra* mt = bufDgArrRaw[i]->data.dsMuonTra;
-                    while (mt && total < MAX_MT_BUF) {
-                        if (mt->data.trangThai == DANG_MUON) {
-                            NodeSach* ns = nullptr;
-                            DauSach* ds = service.findDauSachByMaSach(mt->data.maSach, ns);
-                            bufMtAll[total].maThe = bufDgArrRaw[i]->data.maThe;
-                            sprintf(bufMtAll[total].hoTen, "%s %s",
-                                    bufDgArrRaw[i]->data.ho, bufDgArrRaw[i]->data.ten);
-                            strcpy(bufMtAll[total].maSach, mt->data.maSach);
-                            strcpy(bufMtAll[total].tenSach, ds ? ds->tenSach : "N/A");
-                            bufMtAll[total].ngayMuon = mt->data.ngayMuon;
-                            bufMtAll[total].days = daysBetween(mt->data.ngayMuon, getCurrentDate());
-                            total++;
+                if (currentTab == 2) {
+                    int total = 0;
+                    for (int i = 0; i < nDGRaw && total < MAX_MT_BUF; i++) {
+                        NodeMuonTra* mt = bufDgArrRaw[i]->data.dsMuonTra;
+                        while (mt && total < MAX_MT_BUF) {
+                            if (mt->data.trangThai == DANG_MUON) {
+                                NodeSach* ns = nullptr;
+                                DauSach* ds = service.findDauSachByMaSach(mt->data.maSach, ns);
+                                bufMtAll[total].maThe = bufDgArrRaw[i]->data.maThe;
+                                sprintf(bufMtAll[total].hoTen, "%s %s", bufDgArrRaw[i]->data.ho, bufDgArrRaw[i]->data.ten);
+                                strcpy(bufMtAll[total].maSach, mt->data.maSach);
+                                strcpy(bufMtAll[total].tenSach, ds ? ds->tenSach : "N/A");
+                                bufMtAll[total].ngayMuon = mt->data.ngayMuon;
+                                bufMtAll[total].days = daysBetween(mt->data.ngayMuon, getCurrentDate());
+                                total++;
+                            }
+                            mt = mt->next;
                         }
-                        mt = mt->next;
                     }
+                    filterAndSortMuonTra(bufMtAll, total, bufMtArr, nMT);
                 }
-                filterAndSortMuonTra(bufMtAll, total, bufMtArr, nMT);
-            }
 
-            int nQH = 0;
-            if (currentTab == 3) {
-                int cnt = 0;
-                service.getOverdueList(bufQhRaw, cnt);
-                filterAndSortQuaHan(bufQhRaw, cnt, bufQhArr, nQH);
-            }
-
-            int nT10 = 0;
-            if (currentTab == 4) {
-                int cnt = 0;
-                service.getTop10Books(bufTopRaw, cnt);
-                for (int i = 0; i < cnt; i++) {
-                    bufTrRaw[i].rank = i + 1;
-                    bufTrRaw[i].ds = bufTopRaw[i];
+                if (currentTab == 3) {
+                    int cnt = 0;
+                    service.getOverdueList(bufQhRaw, cnt);
+                    filterAndSortQuaHan(bufQhRaw, cnt, bufQhArr, nQH);
                 }
-                filterAndSortTop10(bufTrRaw, cnt, bufTrArr, nT10);
+
+                if (currentTab == 4) {
+                    int cnt = 0;
+                    service.getTop10Books(bufTopRaw, cnt);
+                    for (int i = 0; i < cnt; i++) {
+                        bufTrRaw[i].rank = i + 1;
+                        bufTrRaw[i].ds = bufTopRaw[i];
+                    }
+                    filterTop10(bufTrRaw, cnt, bufTrArr, nT10);
+                }
+                
+                needUpdateData = false;
             }
 
             drawTopDashboard(nDGRaw, nDSRaw);
             drawTabs();
-            drawSearchBar(isSearching);
+            drawFieldAndSearchBars(isSearching);
 
             if (currentTab == 0) renderTabDocGia(bufDgArr, nDG);
             else if (currentTab == 1) renderTabDauSach(bufDsView, nDS, bufTreeRows, nTreeRows);
@@ -1487,11 +1354,12 @@ public:
             screen.putChar(SCREEN_W - 2, 3, B_TR, C_BORDER);
             screen.putChar(1, 4, B_V, C_BORDER);
             screen.putChar(SCREEN_W - 2, 4, B_V, C_BORDER);
-            screen.putChar(1, 5, B_L, C_BORDER);
-            screen.putChar(SCREEN_W - 2, 5, B_R, C_BORDER);
+            screen.putChar(1, 5, B_V, C_BORDER);
+            screen.putChar(SCREEN_W - 2, 5, B_V, C_BORDER);
+            screen.putChar(1, 6, B_L, C_BORDER);
+            screen.putChar(SCREEN_W - 2, 6, B_R, C_BORDER);
 
             screen.render();
-
             int ch = _getch();
 
             if (ch == 0 || ch == 224) {
@@ -1503,67 +1371,78 @@ public:
                 else if (ext == KEY_PGDN) selectedRow += 10;
 
                 else if (ext == KEY_LEFT) {
-                    if (!isSearching) {
-                        if (currentTab > 0) currentTab--; else currentTab = 4;
-                        selectedRow = 0; scrollOffset = 0;
+                    if (!(currentTab == 1 && viewCategoryTree)) {
+                        if (selectedCol[currentTab] > 0) selectedCol[currentTab]--;
+                        else selectedCol[currentTab] = numFiltersForTab[currentTab] - 1;
+                        if (strlen(searchKeyword[currentTab]) > 0) {
+                            selectedRow = 0; scrollOffset = 0; needUpdateData = true;
+                        }
                     }
                 }
                 else if (ext == KEY_RIGHT) {
-                    if (!isSearching) {
-                        if (currentTab < 4) currentTab++; else currentTab = 0;
-                        selectedRow = 0; scrollOffset = 0;
+                    if (!(currentTab == 1 && viewCategoryTree)) {
+                        if (selectedCol[currentTab] < numFiltersForTab[currentTab] - 1) selectedCol[currentTab]++;
+                        else selectedCol[currentTab] = 0;
+                        if (strlen(searchKeyword[currentTab]) > 0) {
+                            selectedRow = 0; scrollOffset = 0; needUpdateData = true;
+                        }
                     }
                 }
 
                 if (!isSearching) {
                     if (currentTab == 0) {
-                        if (ext == KEY_F1) dialogAddOrEditDocGia(nullptr);
-                        else if (ext == KEY_F2 && nDG > 0) dialogAddOrEditDocGia(bufDgArr[selectedRow]);
+                        if (ext == KEY_F1) { dialogAddOrEditDocGia(nullptr); needUpdateData = true; }
+                        else if (ext == KEY_F2 && nDG > 0) { dialogAddOrEditDocGia(bufDgArr[selectedRow]); needUpdateData = true; }
                         else if (ext == KEY_F3 && nDG > 0) {
                             if (screen.showConfirm("Xac nhan xoa doc gia nay?")) {
                                 bool ok = service.removeDocGia(bufDgArr[selectedRow]->data.maThe);
                                 screen.showMessage(ok ? "Da xoa!" : "Loi: Doc gia dang muon sach!");
+                                needUpdateData = true;
                             }
                         }
+                        else if (ext == KEY_F4) {
+                            // Chuyen nhanh qua lai giua TEN + HO (index 1) va MA THE (index 0)
+                            if ((sortCol[0] == 1 || sortCol[0] == 3) && sortState[0] == 1) {
+                                sortCol[0] = 0;
+                                selectedCol[0] = 0;
+                                sortState[0] = 1;
+                            } else {
+                                sortCol[0] = 1;
+                                selectedCol[0] = 1;
+                                sortState[0] = 1;
+                            }
+                            selectedRow = 0; scrollOffset = 0;
+                            needUpdateData = true;
+                        }
                     } else if (currentTab == 1) {
-                        if (ext == KEY_F1) dialogAddDauSach();
+                        if (ext == KEY_F1) { dialogAddDauSach(); needUpdateData = true; }
                         else if (ext == KEY_F2) {
                             DauSach* targetDS = nullptr;
-                            if (viewCategoryTree) {
-                                if (nTreeRows > 0 && !bufTreeRows[selectedRow].isCategory)
-                                    targetDS = bufTreeRows[selectedRow].ds;
-                            } else {
-                                if (nDS > 0) targetDS = bufDsView[selectedRow];
-                            }
-                            if (targetDS) dialogEditDauSach(targetDS);
+                            if (viewCategoryTree) { if (nTreeRows > 0 && !bufTreeRows[selectedRow].isCategory) targetDS = bufTreeRows[selectedRow].ds; }
+                            else { if (nDS > 0) targetDS = bufDsView[selectedRow]; }
+                            if (targetDS) { dialogEditDauSach(targetDS); needUpdateData = true; }
                         }
                         else if (ext == KEY_F3) {
                             DauSach* targetDS = nullptr;
-                            if (viewCategoryTree) {
-                                if (nTreeRows > 0 && !bufTreeRows[selectedRow].isCategory)
-                                    targetDS = bufTreeRows[selectedRow].ds;
-                            } else {
-                                if (nDS > 0) targetDS = bufDsView[selectedRow];
-                            }
+                            if (viewCategoryTree) { if (nTreeRows > 0 && !bufTreeRows[selectedRow].isCategory) targetDS = bufTreeRows[selectedRow].ds; }
+                            else { if (nDS > 0) targetDS = bufDsView[selectedRow]; }
                             if (targetDS) {
                                 if (screen.showConfirm("Xac nhan XOA Dau sach nay va toan bo sach con?")) {
-                                    if (service.removeDauSach(targetDS->ISBN)) {
-                                        selectedRow = 0; scrollOffset = 0;
-                                    } else {
-                                        screen.showMessage("Loi: Dang co sach duoc muon, khong the xoa!", true);
-                                    }
+                                    if (service.removeDauSach(targetDS->ISBN)) { selectedRow = 0; scrollOffset = 0; needUpdateData = true; }
+                                    else screen.showMessage("Loi: Dang co sach duoc muon, khong the xoa!", true);
                                 }
                             }
                         }
                         else if (ext == KEY_F4) {
                             viewCategoryTree = !viewCategoryTree;
                             selectedRow = 0; scrollOffset = 0;
+                            needUpdateData = true;
                         }
                         else if (ext == KEY_F5) dialogTraCuuMaSach();
                     } else if (currentTab == 2) {
-                        if (ext == KEY_F1) dialogBorrowOrReturn(0);
-                        else if (ext == KEY_F2) dialogBorrowOrReturn(1);
-                        else if (ext == KEY_F3) dialogBorrowOrReturn(2);
+                        if (ext == KEY_F1) { dialogBorrowOrReturn(0); needUpdateData = true; }
+                        else if (ext == KEY_F2) { dialogBorrowOrReturn(1); needUpdateData = true; }
+                        else if (ext == KEY_F3) { dialogBorrowOrReturn(2); needUpdateData = true; }
                     }
                 }
                 continue;
@@ -1571,40 +1450,19 @@ public:
 
             if (isSearching) {
                 bool keywordChanged = false;
-
-                if (ch == KEY_ENTER) {
-                    isSearching = false;
-                } else if (ch == KEY_ESC) {
-                    isSearching = false;
-                    strcpy(searchKeyword[currentTab], backupKeyword);
-                    keywordChanged = true;
-                } else if (ch == KEY_TAB) {
-                    if (GetKeyState(VK_SHIFT) < 0) {
-                        if (selectedCol[currentTab] > 0) selectedCol[currentTab]--;
-                        else selectedCol[currentTab] = numFiltersForTab[currentTab] - 1;
-                    } else {
-                        if (selectedCol[currentTab] < numFiltersForTab[currentTab] - 1) selectedCol[currentTab]++;
-                        else selectedCol[currentTab] = 0;
-                    }
-                    sortState[currentTab] = 0;
-                    keywordChanged = true;
+                if (ch == KEY_ENTER) isSearching = false;
+                else if (ch == KEY_ESC) {
+                    isSearching = false; strcpy(searchKeyword[currentTab], backupKeyword); keywordChanged = true;
                 } else if (ch == 8) {
-                    int len = strlen(searchKeyword[currentTab]);
-                    if (len > 0) {
-                        searchKeyword[currentTab][len - 1] = '\0';
-                        keywordChanged = true;
-                    }
+                    int len = (int)strlen(searchKeyword[currentTab]);
+                    if (len > 0) { searchKeyword[currentTab][len - 1] = '\0'; keywordChanged = true; }
                 } else if (ch >= 32 && ch <= 126) {
-                    int len = strlen(searchKeyword[currentTab]);
-                    if (len < 38) {
-                        searchKeyword[currentTab][len] = (char)ch;
-                        searchKeyword[currentTab][len + 1] = '\0';
-                        keywordChanged = true;
-                    }
+                    int len = (int)strlen(searchKeyword[currentTab]);
+                    if (len < 38) { searchKeyword[currentTab][len] = (char)ch; searchKeyword[currentTab][len + 1] = '\0'; keywordChanged = true; }
                 }
 
                 if (!(currentTab == 1 && viewCategoryTree)) {
-                    if (keywordChanged) { selectedRow = 0; scrollOffset = 0; }
+                    if (keywordChanged) { selectedRow = 0; scrollOffset = 0; needUpdateData = true; }
                 }
                 continue;
             }
@@ -1612,53 +1470,57 @@ public:
             if (ch == KEY_ESC) {
                 int ans = screen.showExitConfirm();
                 if (ans == 1) { service.saveToFile(); break; }
-                else if (ans == 0) { break; }
+                else if (ans == 0) break;
                 continue;
             }
 
             if (ch == KEY_TAB) {
                 if (GetKeyState(VK_SHIFT) < 0) {
-                    if (selectedCol[currentTab] > 0) selectedCol[currentTab]--;
-                    else selectedCol[currentTab] = numFiltersForTab[currentTab] - 1;
+                    if (currentTab > 0) currentTab--; else currentTab = 4;
                 } else {
-                    if (selectedCol[currentTab] < numFiltersForTab[currentTab] - 1) selectedCol[currentTab]++;
-                    else selectedCol[currentTab] = 0;
+                    if (currentTab < 4) currentTab++; else currentTab = 0;
                 }
-                sortState[currentTab] = 0; selectedRow = 0; scrollOffset = 0;
+                selectedRow = 0; scrollOffset = 0;
+                needUpdateData = true;
                 continue;
             }
 
             if (ch == KEY_ENTER) {
                 if (currentTab == 0) {
-                    if (nDG > 0) renderDialogChiTietDocGia(bufDgArr[selectedRow]);
+                    if (nDG > 0) { renderDialogChiTietDocGia(bufDgArr[selectedRow]); needUpdateData = true; }
                 } else if (currentTab == 1) {
                     if (viewCategoryTree) {
-                        if (nTreeRows > 0 && !bufTreeRows[selectedRow].isCategory && bufTreeRows[selectedRow].ds)
-                            renderDialogChiTietSach(bufTreeRows[selectedRow].ds);
+                        if (nTreeRows > 0 && !bufTreeRows[selectedRow].isCategory && bufTreeRows[selectedRow].ds) {
+                            renderDialogChiTietSach(bufTreeRows[selectedRow].ds); needUpdateData = true;
+                        }
                     } else {
-                        if (nDS > 0) renderDialogChiTietSach(bufDsView[selectedRow]);
+                        if (nDS > 0) { renderDialogChiTietSach(bufDsView[selectedRow]); needUpdateData = true; }
                     }
                 }
             }
 
             if (ch == 'f' || ch == 'F') {
                 if (!isSearching) {
-                    if (currentTab == 1 && viewCategoryTree) {
-                        screen.showMessage("Tinh nang tim kiem bi vo hieu hoa o che do nay!");
-                    } else {
-                        isSearching = true;
-                        strcpy(backupKeyword, searchKeyword[currentTab]);
-                    }
+                    if (currentTab == 1 && viewCategoryTree) screen.showMessage("Tinh nang tim kiem bi vo hieu hoa o che do nay!");
+                    else { isSearching = true; strcpy(backupKeyword, searchKeyword[currentTab]); }
                 }
                 continue;
             }
 
             if (ch == 's' || ch == 'S') {
-                if (currentTab == 1 && viewCategoryTree) {
-                    screen.showMessage("Khong the xap xep o che do nay!");
+                if (currentTab == 4) {
+                    screen.showMessage("Tab Top 10 luon co dinh theo thu hang luot muon!");
+                } else if (currentTab == 1 && viewCategoryTree) {
+                    screen.showMessage("Khong the sap xep o che do nay!");
                 } else {
-                    sortState[currentTab] = (sortState[currentTab] + 1) % 3;
+                    if (sortCol[currentTab] == selectedCol[currentTab]) {
+                        sortState[currentTab] = (sortState[currentTab] == 1) ? 2 : 1;
+                    } else {
+                        sortCol[currentTab] = selectedCol[currentTab];
+                        sortState[currentTab] = 1;
+                    }
                     selectedRow = 0; scrollOffset = 0;
+                    needUpdateData = true;
                 }
                 continue;
             }

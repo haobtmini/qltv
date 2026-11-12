@@ -4,6 +4,7 @@
 #include "models.h"
 #include <cstdio>
 #include <cstring>
+#include <cstdlib>
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -25,27 +26,21 @@ public:
 private:
     ListDauSach dsDauSach;
     NodeDocGia* rootDocGia;
-    KeyManager kmDocGia;
+    BinaryKeyQueue kmDocGia;
 
-    int getHeight(NodeDocGia* node) { return node ? node->height : 0; }
-    int getBalance(NodeDocGia* node) { return node ? getHeight(node->left) - getHeight(node->right) : 0; }
-    int maxVal(int a, int b) { return (a > b) ? a : b; }
-
-    NodeDocGia* rotateRight(NodeDocGia* y) {
-        NodeDocGia* x = y->left;
-        NodeDocGia* T2 = x->right;
-        x->right = y; y->left = T2;
-        y->height = maxVal(getHeight(y->left), getHeight(y->right)) + 1;
-        x->height = maxVal(getHeight(x->left), getHeight(x->right)) + 1;
-        return x;
+    static std::string trim(const std::string& str) {
+        size_t first = str.find_first_not_of(" \t\r\n");
+        if (first == std::string::npos) return "";
+        size_t last = str.find_last_not_of(" \t\r\n");
+        return str.substr(first, (last - first + 1));
     }
-    NodeDocGia* rotateLeft(NodeDocGia* x) {
-        NodeDocGia* y = x->right;
-        NodeDocGia* T2 = y->left;
-        y->left = x; x->right = T2;
-        x->height = maxVal(getHeight(x->left), getHeight(x->right)) + 1;
-        y->height = maxVal(getHeight(y->left), getHeight(y->right)) + 1;
-        return y;
+
+    static int safeStoi(const std::string& s, int defaultVal = 0) {
+        std::string t = trim(s);
+        if (t.empty()) return defaultVal;
+        char* endPtr = nullptr;
+        long val = std::strtol(t.c_str(), &endPtr, 10);
+        return (endPtr == t.c_str()) ? defaultVal : (int)val;
     }
 
     NodeDocGia* insertBST(NodeDocGia* root, TheDocGia dg) {
@@ -54,25 +49,10 @@ private:
             newNode->data = dg;
             newNode->left = nullptr;
             newNode->right = nullptr;
-            newNode->height = 1;
             return newNode;
         }
         if (dg.maThe < root->data.maThe) root->left = insertBST(root->left, dg);
         else if (dg.maThe > root->data.maThe) root->right = insertBST(root->right, dg);
-        else return root;
-
-        root->height = 1 + maxVal(getHeight(root->left), getHeight(root->right));
-        int balance = getBalance(root);
-        if (balance > 1 && dg.maThe < root->left->data.maThe) return rotateRight(root);
-        if (balance < -1 && dg.maThe > root->right->data.maThe) return rotateLeft(root);
-        if (balance > 1 && dg.maThe > root->left->data.maThe) {
-            root->left = rotateLeft(root->left);
-            return rotateRight(root);
-        }
-        if (balance < -1 && dg.maThe < root->right->data.maThe) {
-            root->right = rotateRight(root->right);
-            return rotateLeft(root);
-        }
         return root;
     }
 
@@ -92,26 +72,35 @@ private:
                 mt = mt->next;
             }
             success = true;
-            if (!root->left) { NodeDocGia* tmp = root->right; delete root; root = tmp; }
-            else if (!root->right) { NodeDocGia* tmp = root->left; delete root; root = tmp; }
-            else {
+            if (!root->left) {
+                NodeDocGia* tmp = root->right;
+                while (root->data.dsMuonTra) {
+                    NodeMuonTra* delMT = root->data.dsMuonTra;
+                    root->data.dsMuonTra = delMT->next;
+                    delete delMT;
+                }
+                delete root;
+                return tmp;
+            } else if (!root->right) {
+                NodeDocGia* tmp = root->left;
+                while (root->data.dsMuonTra) {
+                    NodeMuonTra* delMT = root->data.dsMuonTra;
+                    root->data.dsMuonTra = delMT->next;
+                    delete delMT;
+                }
+                delete root;
+                return tmp;
+            } else {
                 NodeDocGia* tmp = findMin(root->right);
+                while (root->data.dsMuonTra) {
+                    NodeMuonTra* delMT = root->data.dsMuonTra;
+                    root->data.dsMuonTra = delMT->next;
+                    delete delMT;
+                }
                 root->data = tmp->data;
+                tmp->data.dsMuonTra = nullptr;
                 root->right = deleteBST(root->right, tmp->data.maThe, success);
             }
-        }
-        if (!root) return nullptr;
-        root->height = 1 + maxVal(getHeight(root->left), getHeight(root->right));
-        int balance = getBalance(root);
-        if (balance > 1 && getBalance(root->left) >= 0) return rotateRight(root);
-        if (balance > 1 && getBalance(root->left) < 0) {
-            root->left = rotateLeft(root->left);
-            return rotateRight(root);
-        }
-        if (balance < -1 && getBalance(root->right) <= 0) return rotateLeft(root);
-        if (balance < -1 && getBalance(root->right) > 0) {
-            root->right = rotateRight(root->right);
-            return rotateLeft(root);
         }
         return root;
     }
@@ -125,16 +114,9 @@ private:
         delete root;
     }
 
-    static std::string trim(const std::string& str) {
-        size_t first = str.find_first_not_of(" \t\r\n");
-        if (first == std::string::npos) return "";
-        size_t last = str.find_last_not_of(" \t\r\n");
-        return str.substr(first, (last - first + 1));
-    }
-
 public:
     LibraryService() : rootDocGia(nullptr) {
-        kmDocGia.init(1);
+        kmDocGia.init(131071);
     }
 
     ~LibraryService() { clearData(); }
@@ -148,6 +130,7 @@ public:
         dsDauSach.n = 0;
         freeBST(rootDocGia);
         rootDocGia = nullptr;
+        kmDocGia.init(131071);
     }
 
     bool loadFromFile(const char* = nullptr) {
@@ -172,15 +155,13 @@ public:
 
                     std::getline(ss, token, '|'); strcpy(ds->ISBN, token.c_str());
                     std::getline(ss, token, '|'); strcpy(ds->tenSach, token.c_str());
-                    std::getline(ss, token, '|'); ds->soTrang = std::stoi(token);
+                    std::getline(ss, token, '|'); ds->soTrang = safeStoi(token);
                     std::getline(ss, token, '|'); strcpy(ds->tacGia, token.c_str());
-                    std::getline(ss, token, '|'); ds->namXB = std::stoi(token);
+                    std::getline(ss, token, '|'); ds->namXB = safeStoi(token);
                     std::getline(ss, token, '|'); strcpy(ds->theLoai, token.c_str());
-                    std::getline(ss, token, '|'); ds->soLuongSach = std::stoi(token);
-                    std::getline(ss, token, '|'); ds->soLuotMuon = std::stoi(token);
-                    std::getline(ss, token, '|'); int nDMS = std::stoi(token);
-
-                    ds->kmSach.loadFromFile(fDS);
+                    std::getline(ss, token, '|'); ds->soLuongSach = safeStoi(token);
+                    std::getline(ss, token, '|'); ds->soLuotMuon = safeStoi(token);
+                    std::getline(ss, token, '|'); int nDMS = safeStoi(token);
 
                     ds->dms = nullptr;
                     NodeSach* tail = nullptr;
@@ -195,7 +176,7 @@ public:
                         NodeSach* p = new NodeSach();
 
                         std::getline(ssDMS, token, '|'); strcpy(p->data.maSach, token.c_str());
-                        std::getline(ssDMS, token, '|'); p->data.trangThai = (TrangThaiSach)std::stoi(token);
+                        std::getline(ssDMS, token, '|'); p->data.trangThai = (TrangThaiSach)safeStoi(token);
                         std::getline(ssDMS, token, '|'); strcpy(p->data.viTri, token.c_str());
                         p->next = nullptr;
 
@@ -228,12 +209,12 @@ public:
                     std::string token;
                     TheDocGia dg{};
 
-                    std::getline(ss, token, '|'); dg.maThe = std::stoi(token);
+                    std::getline(ss, token, '|'); dg.maThe = safeStoi(token);
                     std::getline(ss, token, '|'); strcpy(dg.ho, token.c_str());
                     std::getline(ss, token, '|'); strcpy(dg.ten, token.c_str());
                     std::getline(ss, token, '|'); strcpy(dg.phai, token.c_str());
-                    std::getline(ss, token, '|'); dg.trangThai = (TrangThaiThe)std::stoi(token);
-                    std::getline(ss, token, '|'); int nMT = std::stoi(token);
+                    std::getline(ss, token, '|'); dg.trangThai = (TrangThaiThe)safeStoi(token);
+                    std::getline(ss, token, '|'); int nMT = safeStoi(token);
 
                     dg.dsMuonTra = nullptr;
                     NodeMuonTra* tailMT = nullptr;
@@ -257,7 +238,7 @@ public:
                         std::stringstream ssDateT(token);
                         ssDateT >> p->data.ngayTra.d >> p->data.ngayTra.m >> p->data.ngayTra.y;
 
-                        std::getline(ssMT, token, '|'); p->data.trangThai = (TrangThaiMuonTra)std::stoi(token);
+                        std::getline(ssMT, token, '|'); p->data.trangThai = (TrangThaiMuonTra)safeStoi(token);
                         p->next = nullptr;
 
                         if (!dg.dsMuonTra) dg.dsMuonTra = p;
@@ -285,8 +266,6 @@ public:
                     ds->ISBN, ds->tenSach, ds->soTrang, ds->tacGia, ds->namXB,
                     ds->theLoai, ds->soLuongSach, ds->soLuotMuon, nDMS);
 
-                ds->kmSach.saveToFile(fDS);
-
                 for (NodeSach* p = ds->dms; p != nullptr; p = p->next) {
                     fprintf(fDS, "%s|%d|%s\n", p->data.maSach, (int)p->data.trangThai, p->data.viTri);
                 }
@@ -300,9 +279,18 @@ public:
 
             NodeDocGia** arr = new NodeDocGia*[MAX_DOC_GIA];
             int nDG = 0;
-            getReadersList(arr, nDG, false);
-            fprintf(fDG, "%d\n", nDG);
+            if (rootDocGia) {
+                CustomStack<NodeDocGia*> st;
+                st.push(rootDocGia);
+                while (!st.isEmpty()) {
+                    NodeDocGia* curr = st.pop();
+                    arr[nDG++] = curr;
+                    if (curr->right) st.push(curr->right);
+                    if (curr->left) st.push(curr->left);
+                }
+            }
 
+            fprintf(fDG, "%d\n", nDG);
             for (int i = 0; i < nDG; i++) {
                 TheDocGia& dg = arr[i]->data;
                 int nMT = 0;
@@ -438,46 +426,39 @@ public:
     }
 
     void addSachAuto(DauSach* ds, int soLuong, const char* viTriMacDinh) {
-        if (!ds) return;
-        auto getSuffix = [](const char* ma) {
-            const char* us = strchr(ma, '_');
-            return us ? atoi(us + 1) : 0;
-        };
+        if (!ds || soLuong <= 0) return;
+
+        int lastId = 0;
+        NodeSach* tail = ds->dms;
+        if (tail) {
+            while (tail->next) tail = tail->next;
+            const char* us = strchr(tail->data.maSach, '_');
+            if (us) lastId = atoi(us + 1);
+        }
+
         for (int i = 0; i < soLuong; i++) {
+            lastId++;
             ds->soLuongSach++;
+
             NodeSach* p = new NodeSach;
-            int nextId = ds->kmSach.getNewKey();
-            sprintf(p->data.maSach, "%s_%d", ds->ISBN, nextId);
+            sprintf(p->data.maSach, "%s_%d", ds->ISBN, lastId);
             p->data.trangThai = CHO_MUON_DUOC;
             strcpy(p->data.viTri, viTriMacDinh);
             p->next = nullptr;
 
             if (!ds->dms) {
-                ds->dms = p;
+                ds->dms = tail = p;
             } else {
-                int newSuffix = nextId;
-                if (getSuffix(ds->dms->data.maSach) > newSuffix) {
-                    p->next = ds->dms;
-                    ds->dms = p;
-                } else {
-                    NodeSach* curr = ds->dms;
-                    while (curr->next && getSuffix(curr->next->data.maSach) < newSuffix) curr = curr->next;
-                    p->next = curr->next;
-                    curr->next = p;
-                }
+                tail->next = p;
+                tail = p;
             }
         }
     }
 
     bool removeSachVatLy(DauSach* ds, const char* maSach) {
         if (!ds || !ds->dms) return false;
-        auto recycleKey = [](DauSach* d, const char* ms) {
-            const char* underscore = strchr(ms, '_');
-            if (underscore) d->kmSach.returnKey(atoi(underscore + 1));
-        };
         if (_stricmp(ds->dms->data.maSach, maSach) == 0) {
             if (ds->dms->data.trangThai == DA_CHO_MUON) return false;
-            recycleKey(ds, ds->dms->data.maSach);
             NodeSach* temp = ds->dms;
             ds->dms = ds->dms->next;
             delete temp;
@@ -488,7 +469,6 @@ public:
         while (p->next) {
             if (_stricmp(p->next->data.maSach, maSach) == 0) {
                 if (p->next->data.trangThai == DA_CHO_MUON) return false;
-                recycleKey(ds, p->next->data.maSach);
                 NodeSach* temp = p->next;
                 p->next = p->next->next;
                 delete temp;

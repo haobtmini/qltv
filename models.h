@@ -26,88 +26,121 @@ inline long dateToDays(Date dt) {
 inline int daysBetween(Date d1, Date d2) {
     return (int)(dateToDays(d2) - dateToDays(d1));
 }
-class KeyManager {
+
+class BinaryKeyQueue {
 private:
-    struct Node {
-        int key;
-        Node* next;
-        Node(int k) : key(k), next(nullptr) {}
+    struct RangeNode {
+        int l, r;
+        RangeNode* next;
+        RangeNode(int _l, int _r) : l(_l), r(_r), next(nullptr) {}
     };
-    Node* head;  
-    int maxKey; 
+    struct ReuseNode {
+        int key;
+        ReuseNode* next;
+        ReuseNode(int k) : key(k), next(nullptr) {}
+    };
+
+    RangeNode *qHead, *qTail;
+    ReuseNode *reuseHead;
+    int maxLimit;
+
+    void enqueue(int l, int r) {
+        if (l > r) return;
+        RangeNode* node = new RangeNode(l, r);
+        if (!qTail) qHead = qTail = node;
+        else { qTail->next = node; qTail = node; }
+    }
+
+    bool dequeue(int& l, int& r) {
+        if (!qHead) return false;
+        RangeNode* temp = qHead;
+        l = temp->l; r = temp->r;
+        qHead = qHead->next;
+        if (!qHead) qTail = nullptr;
+        delete temp;
+        return true;
+    }
+
+    void clearAll() {
+        int l, r;
+        while (dequeue(l, r));
+        while (reuseHead) {
+            ReuseNode* temp = reuseHead;
+            reuseHead = reuseHead->next;
+            delete temp;
+        }
+    }
 
 public:
-    KeyManager() : head(nullptr), maxKey(1) {}
+    BinaryKeyQueue() : qHead(nullptr), qTail(nullptr), reuseHead(nullptr), maxLimit(1023) {}
 
-    void init(int startKey) { maxKey = startKey; }
+    void init(int limit = 1023) {
+        clearAll();
+        maxLimit = limit;
+        enqueue(1, maxLimit);
+    }
 
     int getNewKey() {
-        if (head) {
-            int reusedKey = head->key;
-            Node* temp = head;
-            head = head->next;
+        if (reuseHead) {
+            int k = reuseHead->key;
+            ReuseNode* temp = reuseHead;
+            reuseHead = reuseHead->next;
             delete temp;
-            return reusedKey;
+            return k;
         }
-        return maxKey++;
+        int l, r;
+        if (dequeue(l, r)) {
+            int mid = l + (r - l) / 2;
+            enqueue(l, mid - 1);
+            enqueue(mid + 1, r);
+            return mid;
+        }
+        int oldLimit = maxLimit;
+        maxLimit = maxLimit * 2 + 1;
+        enqueue(oldLimit + 1, maxLimit);
+        return getNewKey();
     }
 
     void returnKey(int key) {
-        Node* newNode = new Node(key);
-        newNode->next = head;
-        head = newNode;
+        ReuseNode* node = new ReuseNode(key);
+        node->next = reuseHead;
+        reuseHead = node;
     }
 
     void saveToFile(FILE* f) {
         if (!f) return;
-        int count = 0;
-        Node* p = head;
-        while (p) { count++; p = p->next; }
-        
-        fprintf(f, "%d %d\n", maxKey, count);
-        
-        p = head;
-        while (p) {
-            fprintf(f, "%d ", p->key);
-            p = p->next;
-        }
-        if (count > 0) fprintf(f, "\n");
+        int rCount = 0, qCount = 0;
+        for (ReuseNode* p = reuseHead; p; p = p->next) rCount++;
+        for (RangeNode* p = qHead; p; p = p->next) qCount++;
+
+        fprintf(f, "%d %d %d\n", maxLimit, rCount, qCount);
+        for (ReuseNode* p = reuseHead; p; p = p->next) fprintf(f, "%d ", p->key);
+        if (rCount > 0) fprintf(f, "\n");
+        for (RangeNode* p = qHead; p; p = p->next) fprintf(f, "%d %d ", p->l, p->r);
+        if (qCount > 0) fprintf(f, "\n");
     }
 
     void loadFromFile(FILE* f) {
         if (!f) return;
-        
-        while (head) {
-            Node* temp = head;
-            head = head->next;
-            delete temp;
-        }
-
-        int count = 0;
-        if (fscanf(f, "%d %d", &maxKey, &count) == 2) {
-            if (count > 0) {
-                int* tempArr = new int[count];
-                for (int i = 0; i < count; i++) {
-                    fscanf(f, "%d", &tempArr[i]);
-                }
-                for (int i = count - 1; i >= 0; i--) {
-                    returnKey(tempArr[i]);
-                }
-                delete[] tempArr;
+        clearAll();
+        int rCount = 0, qCount = 0;
+        if (fscanf(f, "%d %d %d", &maxLimit, &rCount, &qCount) == 3) {
+            if (rCount > 0) {
+                int* tmp = new int[rCount];
+                for (int i = 0; i < rCount; i++) fscanf(f, "%d", &tmp[i]);
+                for (int i = rCount - 1; i >= 0; i--) returnKey(tmp[i]);
+                delete[] tmp;
+            }
+            for (int i = 0; i < qCount; i++) {
+                int l, r;
+                if (fscanf(f, "%d %d", &l, &r) == 2) enqueue(l, r);
             }
         }
-        
         int c;
         while ((c = fgetc(f)) != '\n' && c != EOF);
     }
 
-    ~KeyManager() {
-        while (head) {
-            Node* temp = head;
-            head = head->next;
-            delete temp;
-        }
-    }
+    ~BinaryKeyQueue() { clearAll(); }
 };
 
 enum TrangThaiSach {
@@ -126,7 +159,6 @@ enum TrangThaiThe {
     KHOA = 0,
     HOAT_DONG = 1
 };
-
 
 struct Sach {
     char maSach[25];
@@ -149,7 +181,6 @@ struct DauSach {
     NodeSach* dms;
     int soLuongSach;
     int soLuotMuon;
-    KeyManager kmSach;
 };
 
 struct ListDauSach {
@@ -182,7 +213,6 @@ struct NodeDocGia {
     TheDocGia data;
     NodeDocGia* left;
     NodeDocGia* right;
-    int height;
 };
 
 struct OverdueRecord {
@@ -214,7 +244,5 @@ struct CustomStack {
     }
     ~CustomStack() { while (!isEmpty()) pop(); }
 };
-
-
 
 #endif
